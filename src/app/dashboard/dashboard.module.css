@@ -1,0 +1,230 @@
+/* ===== PAGE ===== */
+.page {
+  min-height: calc(100vh - 64px);
+  background: var(--surface);
+  padding: 32px 24px;
+}
+
+.inner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+/* ===== HEADER ===== */
+.header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 28px;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+
+.header h1 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 4px;
+}
+
+.header p {
+  font-size: 14px;
+  color: var(--ink-light);
+}
+
+.upgradeBanner {
+  font-size: 13px;
+  color: var(--ink-mid);
+  background: var(--amber-pale);
+  border: 1px solid #FCD34D;
+  border-radius: var(--radius);
+  padding: 7px 12px;
+}
+
+.upgradeLink {
+  color: var(--purple-light);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.upgradeLink:hover {
+  text-decoration: underline;
+}
+
+/* ===== STATS GRID ===== */
+.statsGrid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 24px;
+}
+
+.statCard {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+  text-align: center;
+  transition: box-shadow 0.15s;
+}
+
+.statCard:hover {
+  box-shadow: var(--shadow);
+}
+
+.statIcon {
+  font-size: 28px;
+  margin-bottom: 8px;
+  line-height: 1;
+}
+
+.statVal {
+  font-size: 26px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 4px;
+  line-height: 1;
+}
+
+.statLabel {
+  font-size: 12px;
+  color: var(--ink-light);
+  font-weight: 500;
+}
+
+.statTrend {
+  font-size: 11px;
+  color: var(--green);
+  font-weight: 600;
+  margin-top: 4px;
+}
+
+/* ===== GRID ===== */
+.grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+/* ===== CARD ===== */
+.card {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.cardTitle {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+/* ===== ACTION LIST ===== */
+.actionList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.actionItem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 12px;
+  border-radius: var(--radius);
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--ink-mid);
+  text-decoration: none;
+  transition: all 0.12s;
+}
+
+.actionItem:hover {
+  background: var(--purple-pale);
+  color: var(--purple);
+}
+
+.actionItem span {
+  font-size: 18px;
+  width: 24px;
+  text-align: center;
+  flex-shrink: 0;
+}
+
+/* ===== ACTIVITY LIST ===== */
+.activityList {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.activityItem {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.activityItem:last-child {
+  border-bottom: none;
+}
+
+.activityIcon {
+  font-size: 18px;
+  width: 28px;
+  height: 28px;
+  background: var(--surface);
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.activityBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.activityText {
+  display: block;
+  font-size: 13px;
+  color: var(--ink-mid);
+  line-height: 1.4;
+  margin-bottom: 2px;
+}
+
+.activityTime {
+  font-size: 11px;
+  color: var(--ink-light);
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 480px) {
+  .page {
+    padding: 20px 16px;
+  }
+
+  .statsGrid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
+  }
+
+  .header {
+    flex-direction: column;
+  }
+}

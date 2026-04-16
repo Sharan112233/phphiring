@@ -1,0 +1,385 @@
+/* ===== QUICK FILTER STRIP ===== */
+.quickStrip {
+  background: var(--white);
+  border-bottom: 1px solid var(--border);
+  padding: 0 24px;
+  position: sticky;
+  top: 64px;
+  z-index: 100;
+}
+
+.quickInner {
+  max-width: 1200px;
+  margin: 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 0;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.quickInner::-webkit-scrollbar {
+  display: none;
+}
+
+.quickLabel {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--ink-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+  margin-right: 4px;
+}
+
+.quickTag {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--ink-mid);
+  cursor: pointer;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: all 0.12s;
+}
+
+.quickTag:hover {
+  border-color: var(--purple-mid);
+  background: var(--purple-pale);
+  color: var(--purple);
+}
+
+.quickTagActive {
+  background: var(--purple-light);
+  border-color: var(--purple-light);
+  color: #fff;
+}
+
+/* ===== LAYOUT ===== */
+.layout {
+  max-width: 1200px;
+  margin: 0 auto;
+  padding: 24px;
+  display: grid;
+  grid-template-columns: 240px 1fr;
+  gap: 24px;
+  align-items: start;
+}
+
+/* ===== SIDEBAR ===== */
+.sidebar {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  position: sticky;
+  top: 120px;
+  max-height: calc(100vh - 140px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.sidebarTitle {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 14px;
+  padding-bottom: 10px;
+  border-bottom: 1px solid var(--border);
+}
+
+.filterGroup {
+  margin-bottom: 16px;
+}
+
+.filterLabel {
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--ink-light);
+  margin-bottom: 8px;
+}
+
+.filterTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+
+.ftag {
+  padding: 4px 9px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.ftag:hover {
+  border-color: var(--purple-mid);
+  background: var(--purple-pale);
+  color: var(--purple);
+}
+
+.ftagActive {
+  background: var(--purple-pale);
+  border-color: var(--purple-light);
+  color: var(--purple);
+  font-weight: 600;
+}
+
+.clearBtn {
+  width: 100%;
+  padding: 8px;
+  border-radius: var(--radius);
+  border: 1px solid var(--red-pale);
+  background: var(--red-pale);
+  color: var(--red);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.12s;
+  margin-top: 4px;
+}
+
+.clearBtn:hover {
+  background: var(--red);
+  color: #fff;
+}
+
+/* ===== MAIN RESULTS ===== */
+.main {
+  min-width: 0;
+}
+
+.resultsBar {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  margin-bottom: 16px;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.resultsCount {
+  font-size: 14px;
+  color: var(--ink-mid);
+  margin-bottom: 6px;
+}
+
+.resultsCount strong {
+  color: var(--ink);
+  font-weight: 700;
+}
+
+.activePills {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.activePill {
+  padding: 3px 10px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 600;
+  background: var(--purple-pale);
+  border: 1px solid var(--purple-mid);
+  color: var(--purple);
+  cursor: pointer;
+  transition: all 0.1s;
+}
+
+.activePill:hover {
+  background: var(--purple-light);
+  color: #fff;
+}
+
+.resultsControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.viewToggle {
+  display: flex;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.viewBtn {
+  padding: 6px 10px;
+  font-size: 14px;
+  background: var(--white);
+  border: none;
+  cursor: pointer;
+  color: var(--ink-light);
+  transition: all 0.1s;
+}
+
+.viewBtn:hover {
+  background: var(--surface);
+  color: var(--ink);
+}
+
+.viewBtnActive {
+  background: var(--purple-pale);
+  color: var(--purple);
+}
+
+/* ===== LIST VIEW ===== */
+.listView {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+/* ===== GRID VIEW ===== */
+.gridView {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 14px;
+}
+
+/* ===== TALENT CARD ===== */
+.talentCard {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 16px;
+  text-decoration: none;
+  transition: all 0.15s;
+  position: relative;
+  overflow: hidden;
+}
+
+.talentCard:hover {
+  border-color: var(--purple-mid);
+  box-shadow: var(--shadow);
+  transform: translateY(-1px);
+}
+
+.featured {
+  border-color: var(--purple-mid);
+  background: linear-gradient(to right, #fdfcff, var(--white));
+}
+
+.featuredRibbon {
+  position: absolute;
+  top: 10px;
+  right: -22px;
+  background: var(--purple-light);
+  color: #fff;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 28px;
+  transform: rotate(45deg);
+  letter-spacing: 0.05em;
+}
+
+.cardAvatar {
+  width: 52px;
+  height: 52px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 18px;
+  font-weight: 800;
+  flex-shrink: 0;
+}
+
+.cardBody {
+  flex: 1;
+  min-width: 0;
+}
+
+.cardTop {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+  margin-bottom: 4px;
+}
+
+.cardNameRow {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.cardName {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.cardRate {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--purple-light);
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+.cardHeadline {
+  font-size: 13px;
+  color: var(--ink-mid);
+  margin-bottom: 8px;
+  line-height: 1.4;
+}
+
+.cardTags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.cardMeta {
+  font-size: 12px;
+  color: var(--ink-light);
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+    padding: 16px;
+  }
+
+  .sidebar {
+    position: static;
+    max-height: none;
+  }
+
+  .quickStrip {
+    top: 64px;
+  }
+}
+
+@media (max-width: 600px) {
+  .gridView {
+    grid-template-columns: 1fr;
+  }
+
+  .talentCard {
+    flex-direction: column;
+  }
+}

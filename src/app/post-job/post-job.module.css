@@ -1,0 +1,208 @@
+/* ===== PAGE ===== */
+.page {
+  min-height: calc(100vh - 64px);
+  background: var(--surface);
+  padding: 40px 24px;
+}
+
+.pageInner {
+  max-width: 1100px;
+  margin: 0 auto;
+}
+
+.pageHeader {
+  margin-bottom: 32px;
+}
+
+.pageHeader h1 {
+  font-size: 28px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 8px;
+}
+
+.pageHeader p {
+  font-size: 15px;
+  color: var(--ink-light);
+  line-height: 1.6;
+}
+
+/* ===== LAYOUT ===== */
+.layout {
+  display: grid;
+  grid-template-columns: 1fr 300px;
+  gap: 28px;
+  align-items: start;
+}
+
+/* ===== FORM ===== */
+.form {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 28px;
+}
+
+.section {
+  margin-bottom: 28px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid var(--border);
+}
+
+.section:last-of-type {
+  border-bottom: none;
+  margin-bottom: 20px;
+  padding-bottom: 0;
+}
+
+.sectionTitle {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 16px;
+}
+
+/* ===== SKILL GRID ===== */
+.skillGrid {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+
+.skillToggle {
+  padding: 6px 12px;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 500;
+  border: 1px solid var(--border);
+  background: var(--white);
+  color: var(--ink-mid);
+  cursor: pointer;
+  transition: all 0.12s;
+}
+
+.skillToggle:hover {
+  border-color: var(--purple-mid);
+  background: var(--purple-pale);
+  color: var(--purple);
+}
+
+.skillToggleActive {
+  background: var(--purple-pale);
+  border-color: var(--purple-light);
+  color: var(--purple);
+  font-weight: 600;
+}
+
+/* ===== TIPS SIDEBAR ===== */
+.tips {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  position: sticky;
+  top: 88px;
+}
+
+.tipCard {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  padding: 20px;
+}
+
+.tipCard h4 {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.tipList {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.tipList li {
+  font-size: 13px;
+  color: var(--ink-mid);
+  padding-left: 16px;
+  position: relative;
+  line-height: 1.5;
+}
+
+.tipList li::before {
+  content: '→';
+  position: absolute;
+  left: 0;
+  color: var(--purple-light);
+  font-size: 11px;
+}
+
+/* ===== SUCCESS PAGE ===== */
+.successPage {
+  min-height: calc(100vh - 64px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 24px;
+  background: var(--surface);
+}
+
+.successCard {
+  background: var(--white);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-xl);
+  padding: 48px 40px;
+  max-width: 520px;
+  width: 100%;
+  text-align: center;
+  box-shadow: var(--shadow-lg);
+}
+
+.successIcon {
+  font-size: 56px;
+  margin-bottom: 16px;
+  line-height: 1;
+}
+
+.successCard h2 {
+  font-size: 24px;
+  font-weight: 800;
+  color: var(--ink);
+  margin-bottom: 12px;
+}
+
+.successCard p {
+  font-size: 15px;
+  color: var(--ink-mid);
+  line-height: 1.6;
+}
+
+/* ===== RESPONSIVE ===== */
+@media (max-width: 900px) {
+  .layout {
+    grid-template-columns: 1fr;
+  }
+
+  .tips {
+    position: static;
+  }
+}
+
+@media (max-width: 600px) {
+  .page {
+    padding: 24px 16px;
+  }
+
+  .form {
+    padding: 20px 16px;
+  }
+
+  .successCard {
+    padding: 32px 20px;
+  }
+}
