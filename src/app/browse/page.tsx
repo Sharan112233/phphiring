@@ -42,8 +42,6 @@ const QUICK_FILTERS = [
   'Vtiger', 'WooCommerce', 'Magento', 'Drupal', 'Available now', 'Top rated',
 ]
 
-type TalentType = typeof Talent
-
 export default function BrowsePage() {
   const router = useRouter()
   const searchParams = useSearchParams()
