@@ -1,7 +1,7 @@
 'use client'
-import { useState, useRef } from 'react'
+import { Suspense, useState, useRef } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import styles from '../auth.module.css'
 
 type Step =
@@ -159,9 +159,10 @@ function PasswordStrength({ password }: { password: string }) {
   )
 }
 
-// ── Main LoginPage ────────────────────────────────────────────────────────────
-export default function LoginPage() {
+// ── Inner component that uses useSearchParams ────────────────────────────────
+function LoginContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
 
   const [step,    setStep]    = useState<Step>('login')
   const [loading, setLoading] = useState(false)
@@ -212,6 +213,12 @@ export default function LoginPage() {
     setStep(s)
   }
 
+  function getRedirectTarget() {
+    const redirect = searchParams.get('redirect')
+    if (redirect && redirect.startsWith('/')) return redirect
+    return '/dashboard'
+  }
+
   // ── OTP handlers ─────────────────────────────────────────────────────────────
   function handleOTPInput(index: number, value: string) {
     if (!/^\d*$/.test(value)) return
@@ -255,7 +262,7 @@ export default function LoginPage() {
         return
       }
       localStorage.setItem('phphire_user', JSON.stringify(data.user))
-      setTimeout(() => router.push('/dashboard'), 300)
+      setTimeout(() => router.push(getRedirectTarget()), 300)
     } catch {
       setError('Something went wrong. Please try again.')
       setLoading(false)
@@ -323,7 +330,7 @@ export default function LoginPage() {
       }
       localStorage.setItem('phphire_user', JSON.stringify(data.user))
       setSuccess('Email verified! Redirecting...')
-      setTimeout(() => router.push('/dashboard'), 500)
+      setTimeout(() => router.push(getRedirectTarget()), 500)
     } catch {
       setError('Something went wrong.')
       setLoading(false)
@@ -500,7 +507,7 @@ export default function LoginPage() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className={styles.page}>
+    <div className={styles.page} suppressHydrationWarning>
 
       {/* Left panel */}
       <div className={styles.left}>
@@ -926,5 +933,13 @@ export default function LoginPage() {
         </div>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <LoginContent />
+    </Suspense>
   )
 }

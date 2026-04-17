@@ -1,32 +1,44 @@
 'use client'
-import { useState, useEffect } from 'react'
-import { useRouter } from 'next/navigation'
+import { Suspense, useEffect, useState } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
-import Navbar from '../../components/layout/Navbar'
-import Footer from '../../components/layout/Footer'
-import PaymentModal from '../../components/ui/PaymentModal'
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
+import PaymentModal from '@/components/ui/PaymentModal'
+import PageLoader from '@/components/ui/PageLoader'
 
-export default function BrowseJobsPage() {
+const QUICK_FILTERS = ['All', 'Laravel', 'WordPress', 'Symfony', 'Remote', 'Full Time', 'Contract', 'Closing Soon']
+const FRAMEWORKS = ['Laravel', 'Symfony', 'CodeIgniter', 'Yii2', 'CakePHP', 'Slim', 'Zend', 'Phalcon']
+const CMS_ECOM = ['WordPress', 'WooCommerce', 'Drupal', 'Joomla', 'Magento', 'PrestaShop', 'OpenCart']
+const CRMS = ['SugarCRM', 'SuiteCRM', 'Vtiger', 'Dolibarr', 'Odoo', 'EspoCRM', 'CiviCRM']
+const COMBINED = ['PHP', 'MySQL', 'PostgreSQL', 'Redis', 'REST API', 'GraphQL', 'Docker', 'AWS']
+
+function BrowseJobsContent() {
   const router = useRouter()
+  const searchParams = useSearchParams()
   const [jobs, setJobs] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
+  const [quickFilter, setQuickFilter] = useState('All')
   const [applying, setApplying] = useState<string | null>(null)
   const [appliedJobs, setAppliedJobs] = useState<string[]>([])
   const [showPayment, setShowPayment] = useState(false)
   const [toast, setToast] = useState('')
   const [coverModal, setCoverModal] = useState<string | null>(null)
   const [coverNote, setCoverNote] = useState('')
-
-  // Filters
-  const [filterType, setFilterType] = useState('all')
-  const [filterDate, setFilterDate] = useState('all')
-  const [minBudget, setMinBudget] = useState('')
-  const [maxBudget, setMaxBudget] = useState('')
+  const [sortBy, setSortBy] = useState('Newest')
+  const [selFrameworks, setSelFrameworks] = useState<string[]>([])
+  const [selCMS, setSelCMS] = useState<string[]>([])
+  const [selCRMs, setSelCRMs] = useState<string[]>([])
+  const [selCombined, setSelCombined] = useState<string[]>([])
+  const [selType, setSelType] = useState('All')
+  const [selRemote, setSelRemote] = useState('All')
+  const [selDate, setSelDate] = useState('All')
 
   useEffect(() => {
+    setSearch(searchParams.get('q') || '')
     fetchJobs()
-  }, [])
+  }, [searchParams])
 
   const fetchJobs = async () => {
     setLoading(true)
@@ -44,6 +56,23 @@ export default function BrowseJobsPage() {
     }
   }
 
+  const toggle = (list: string[], setList: (v: string[]) => void, val: string) => {
+    setList(list.includes(val) ? list.filter((item) => item !== val) : [...list, val])
+  }
+
+  const clearAll = () => {
+    setSearch('')
+    setQuickFilter('All')
+    setSelFrameworks([])
+    setSelCMS([])
+    setSelCRMs([])
+    setSelCombined([])
+    setSelType('All')
+    setSelRemote('All')
+    setSelDate('All')
+    setSortBy('Newest')
+  }
+
   function showToast(msg: string) {
     setToast(msg)
     setTimeout(() => setToast(''), 3500)
@@ -58,43 +87,29 @@ export default function BrowseJobsPage() {
   }
 
   function daysUntilDeadline(deadline: string | null | undefined) {
-    if (!deadline) return { text: 'No deadline', color: '#6B7280' }
-    
+    if (!deadline) return { text: 'No deadline', color: '#6B7280', diffDays: 999 }
     const today = new Date()
     const deadlineDate = new Date(deadline)
-    
-    if (isNaN(deadlineDate.getTime())) {
-      return { text: 'Invalid date', color: '#6B7280' }
-    }
-    
     const diffTime = deadlineDate.getTime() - today.getTime()
     const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    if (diffDays < 0) return { text: 'Closed', color: '#DC2626' }
-    if (diffDays === 0) return { text: 'Closes today', color: '#DC2626' }
-    if (diffDays === 1) return { text: 'Closes tomorrow', color: '#D97706' }
-    return { text: `${diffDays} days left`, color: '#059669' }
+    if (diffDays < 0) return { text: 'Closed', color: '#DC2626', diffDays }
+    if (diffDays === 0) return { text: 'Closes today', color: '#DC2626', diffDays }
+    if (diffDays === 1) return { text: 'Closes tomorrow', color: '#D97706', diffDays }
+    return { text: `${diffDays} days left`, color: '#059669', diffDays }
   }
 
   function formatBudget(job: any) {
-    if (job.budget_type === 'monthly' || job.budget_type === 'fixed') {
-      const formatNum = (n: number) => {
-        if (n >= 100000) return `₹${(n / 100000).toFixed(1).replace(/\.0$/, '')}L`
-        if (n >= 1000) return `₹${(n / 1000).toFixed(0)}k`
-        return `₹${n}`
-      }
-      return `${formatNum(job.budget_min)}–${formatNum(job.budget_max)}`
-    }
-    return `$${job.budget_min}–$${job.budget_max}/hr`
+    if (!job.budget_min && !job.budget_max) return 'Budget on discussion'
+    if (job.budget_type === 'hourly') return `$${job.budget_min || 0}-$${job.budget_max || 0}/hr`
+    return `₹${job.budget_min || 0}-₹${job.budget_max || 0}`
   }
 
   function filterJobs() {
-    let filtered = jobs
+    let filtered = [...jobs]
 
-    // Search filter
     if (search) {
       const q = search.toLowerCase()
-      filtered = filtered.filter(j =>
+      filtered = filtered.filter((j) =>
         j.title?.toLowerCase().includes(q) ||
         j.company_name?.toLowerCase().includes(q) ||
         j.description?.toLowerCase().includes(q) ||
@@ -102,36 +117,60 @@ export default function BrowseJobsPage() {
       )
     }
 
-    // Type filter
-    if (filterType !== 'all') {
-      filtered = filtered.filter(j => j.hire_type === filterType)
+    if (quickFilter !== 'All') {
+      if (quickFilter === 'Remote') {
+        filtered = filtered.filter((j) => j.remote_ok)
+      } else if (quickFilter === 'Full Time') {
+        filtered = filtered.filter((j) => j.hire_type === 'full_time')
+      } else if (quickFilter === 'Contract') {
+        filtered = filtered.filter((j) => j.hire_type === 'contract')
+      } else if (quickFilter === 'Closing Soon') {
+        filtered = filtered.filter((j) => daysUntilDeadline(j.expires_at).diffDays <= 3)
+      } else {
+        filtered = filtered.filter((j) =>
+          (j.required_skills || []).some((skill: string) => skill.toLowerCase() === quickFilter.toLowerCase())
+        )
+      }
     }
 
-    // Budget filter
-    if (minBudget) {
-      filtered = filtered.filter(j => j.budget_min >= parseInt(minBudget))
-    }
-    if (maxBudget) {
-      filtered = filtered.filter(j => j.budget_max <= parseInt(maxBudget))
+    const allSelected = [...selFrameworks, ...selCMS, ...selCRMs, ...selCombined]
+    if (allSelected.length > 0) {
+      filtered = filtered.filter((j) =>
+        allSelected.some((sel) =>
+          (j.required_skills || []).some((skill: string) => skill.toLowerCase() === sel.toLowerCase())
+        )
+      )
     }
 
-    // Date filter
-    if (filterDate !== 'all') {
+    if (selType !== 'All') {
+      filtered = filtered.filter((j) => j.hire_type === selType)
+    }
+
+    if (selRemote !== 'All') {
+      filtered = filtered.filter((j) => selRemote === 'remote' ? j.remote_ok : !j.remote_ok)
+    }
+
+    if (selDate !== 'All') {
       const today = new Date()
-      filtered = filtered.filter(j => {
-        const jobDate = new Date(j.created_at)
-        const diffDays = Math.ceil((today.getTime() - jobDate.getTime()) / (1000 * 60 * 60 * 24))
-
-        if (filterDate === 'today') return diffDays === 0
-        if (filterDate === 'week') return diffDays <= 7
-        if (filterDate === 'month') return diffDays <= 30
-        if (filterDate === 'active') {
-          if (!j.deadline_date) return true
-          const deadline = new Date(j.deadline_date)
-          return deadline > today
-        }
+      filtered = filtered.filter((j) => {
+        const postedAt = new Date(j.created_at)
+        const diffDays = Math.ceil((today.getTime() - postedAt.getTime()) / (1000 * 60 * 60 * 24))
+        if (selDate === 'today') return diffDays === 0
+        if (selDate === 'week') return diffDays <= 7
+        if (selDate === 'month') return diffDays <= 30
+        if (selDate === 'active') return new Date(j.expires_at) > today
         return true
       })
+    }
+
+    if (sortBy === 'Closing Soon') {
+      filtered.sort((a, b) => daysUntilDeadline(a.expires_at).diffDays - daysUntilDeadline(b.expires_at).diffDays)
+    } else if (sortBy === 'Highest Budget') {
+      filtered.sort((a, b) => (b.budget_max || 0) - (a.budget_max || 0))
+    } else if (sortBy === 'Lowest Budget') {
+      filtered.sort((a, b) => (a.budget_min || 0) - (b.budget_min || 0))
+    } else {
+      filtered.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
     }
 
     return filtered
@@ -172,10 +211,10 @@ export default function BrowseJobsPage() {
         setApplying(null)
         return
       }
-      setAppliedJobs(prev => [...prev, coverModal])
+      setAppliedJobs((prev) => [...prev, coverModal])
       setCoverModal(null)
       setCoverNote('')
-      showToast('Application submitted successfully! 🎉')
+      showToast('Application submitted successfully!')
     } catch {
       showToast('Something went wrong. Try again.')
     }
@@ -184,356 +223,230 @@ export default function BrowseJobsPage() {
 
   const filtered = filterJobs()
 
+  const filterBtnStyle = (active: boolean): React.CSSProperties => ({
+    fontSize: 11,
+    fontWeight: active ? 600 : 400,
+    padding: '4px 10px',
+    borderRadius: 20,
+    border: '1.5px solid',
+    borderColor: active ? '#7C3AED' : '#E8E4F0',
+    background: active ? '#EDE9FE' : '#fff',
+    color: active ? '#5B21B6' : '#3D3558',
+    cursor: 'pointer',
+    transition: 'all 0.12s',
+  })
+
   return (
     <>
       <Navbar />
 
-      {/* Page header */}
-      <div style={{
-        background: 'linear-gradient(135deg, #0F0A1E 0%, #1E1035 100%)',
-        padding: '40px 0 32px',
-      }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px' }}>
-          <h1 style={{ color: '#fff', fontSize: 28, fontWeight: 800, marginBottom: 6 }}>
-            PHP Jobs
-          </h1>
-          <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: 14, marginBottom: 20 }}>
-            Latest PHP jobs from verified businesses — Laravel, Symfony, WordPress, CRM and more
-          </p>
+      <div style={{ background: '#fff', borderBottom: '1px solid #E8E4F0', padding: '10px 0', position: 'sticky', top: 64, zIndex: 90 }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '0 24px', display: 'flex', gap: 7, flexWrap: 'wrap', alignItems: 'center' }}>
+          <span style={{ fontSize: 12, color: '#7B7494', fontWeight: 500, marginRight: 4 }}>Quick:</span>
+          {QUICK_FILTERS.map((item) => (
+            <button
+              key={item}
+              onClick={() => setQuickFilter(item)}
+              style={{
+                fontSize: 12,
+                fontWeight: quickFilter === item ? 700 : 500,
+                padding: '5px 14px',
+                borderRadius: 20,
+                border: '1.5px solid',
+                borderColor: quickFilter === item ? '#7C3AED' : '#E8E4F0',
+                background: quickFilter === item ? '#7C3AED' : '#fff',
+                color: quickFilter === item ? '#fff' : '#3D3558',
+                cursor: 'pointer',
+              }}
+            >
+              {item}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '24px', display: 'grid', gridTemplateColumns: '260px 1fr', gap: 24, alignItems: 'flex-start' }}>
+        <div style={{ background: '#fff', border: '1px solid #E8E4F0', borderRadius: 16, padding: 20, position: 'sticky', top: 120, height: 'fit-content' }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#0F0A1E' }}>Filters</span>
+            <button onClick={clearAll} style={{ fontSize: 12, color: '#7C3AED', background: 'none', border: 'none', cursor: 'pointer', fontWeight: 500 }}>
+              Clear all
+            </button>
+          </div>
+
           <input
             type="text"
-            placeholder="Search by title, skill, framework, company..."
+            placeholder="Search title, skill, company..."
             value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{
-              width: '100%',
-              maxWidth: 560,
-              padding: '12px 18px',
-              borderRadius: 10,
-              border: 'none',
-              fontSize: 14,
-              outline: 'none',
-              background: '#fff',
-              color: '#0F0A1E',
-            }}
+            onChange={(e) => setSearch(e.target.value)}
+            style={{ width: '100%', padding: '9px 12px', border: '1.5px solid #E8E4F0', borderRadius: 10, fontSize: 13, outline: 'none', marginBottom: 16, boxSizing: 'border-box', fontFamily: 'inherit' }}
           />
-        </div>
-      </div>
 
-      {/* Filters */}
-      <div style={{
-        background: '#fff',
-        borderBottom: '1px solid #E8E4F0',
-        padding: '16px 0',
-      }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px' }}>
-          <div style={{
-            display: 'grid',
-            gridTemplateColumns: 'repeat(auto-fit, minmax(160px, 1fr))',
-            gap: 12,
-          }}>
-            <select
-              value={filterType}
-              onChange={e => setFilterType(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #E8E4F0',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              <option value="all">All Types</option>
-              <option value="freelance">Freelance</option>
-              <option value="contract">Contract</option>
-              <option value="full_time">Full Time</option>
-              <option value="part_time">Part Time</option>
-            </select>
-
-            <select
-              value={filterDate}
-              onChange={e => setFilterDate(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #E8E4F0',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            >
-              <option value="all">All Dates</option>
-              <option value="today">Posted Today</option>
-              <option value="week">This Week</option>
-              <option value="month">This Month</option>
-              <option value="active">Still Active</option>
-            </select>
-
-            <input
-              type="number"
-              placeholder="Min Budget"
-              value={minBudget}
-              onChange={e => setMinBudget(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #E8E4F0',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            />
-
-            <input
-              type="number"
-              placeholder="Max Budget"
-              value={maxBudget}
-              onChange={e => setMaxBudget(e.target.value)}
-              style={{
-                padding: '8px 12px',
-                border: '1px solid #E8E4F0',
-                borderRadius: 8,
-                fontSize: 13,
-              }}
-            />
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7B7494', marginBottom: 8 }}>Job Type</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['All', 'freelance', 'contract', 'full_time', 'part_time'].map((type) => (
+                <button key={type} onClick={() => setSelType(type)} style={filterBtnStyle(selType === type)}>
+                  {type === 'All' ? 'All' : type.replace('_', ' ')}
+                </button>
+              ))}
+            </div>
           </div>
-        </div>
-      </div>
 
-      {/* Jobs list */}
-      <div style={{ background: '#FAFAF9', minHeight: '70vh', padding: '24px 0' }}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', padding: '0 24px' }}>
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7B7494', marginBottom: 8 }}>Remote</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['All', 'remote', 'onsite'].map((item) => (
+                <button key={item} onClick={() => setSelRemote(item)} style={filterBtnStyle(selRemote === item)}>
+                  {item === 'All' ? 'All' : item === 'remote' ? 'Remote' : 'On-site/Hybrid'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7B7494', marginBottom: 8 }}>Posted</div>
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              {['All', 'today', 'week', 'month', 'active'].map((item) => (
+                <button key={item} onClick={() => setSelDate(item)} style={filterBtnStyle(selDate === item)}>
+                  {item === 'All' ? 'All' : item === 'week' ? 'This week' : item === 'month' ? 'This month' : item === 'active' ? 'Still active' : 'Today'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {[
+            { label: 'Frameworks', items: FRAMEWORKS, state: selFrameworks, setter: setSelFrameworks },
+            { label: 'CMS / E-Commerce', items: CMS_ECOM, state: selCMS, setter: setSelCMS },
+            { label: 'PHP CRMs', items: CRMS, state: selCRMs, setter: setSelCRMs },
+            { label: 'Combined Skills', items: COMBINED, state: selCombined, setter: setSelCombined },
+          ].map((section) => (
+            <div key={section.label} style={{ marginBottom: 16 }}>
+              <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.06em', color: '#7B7494', marginBottom: 8 }}>
+                {section.label}
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5 }}>
+                {section.items.map((item) => {
+                  const active = section.state.includes(item)
+                  return (
+                    <button key={item} onClick={() => toggle(section.state, section.setter, item)} style={filterBtnStyle(active)}>
+                      {item}
+                    </button>
+                  )
+                })}
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ fontSize: 14, color: '#3D3558' }}>
+              <strong style={{ fontSize: 16, color: '#0F0A1E' }}>{filtered.length}</strong> PHP jobs found
+            </div>
+            <select
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value)}
+              style={{ fontSize: 13, padding: '7px 12px', border: '1.5px solid #E8E4F0', borderRadius: 8, background: '#fff', outline: 'none', cursor: 'pointer', color: '#0F0A1E' }}
+            >
+              {['Newest', 'Closing Soon', 'Highest Budget', 'Lowest Budget'].map((item) => <option key={item}>{item}</option>)}
+            </select>
+          </div>
 
           {loading ? (
-            <div style={{ textAlign: 'center', padding: '60px 0' }}>
-              <div style={{
-                display: 'inline-block',
-                width: 40,
-                height: 40,
-                border: '3px solid #E8E4F0',
-                borderTopColor: '#7C3AED',
-                borderRadius: '50%',
-                animation: 'spin 0.7s linear infinite',
-              }} />
-              <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-            </div>
+            <PageLoader label="Loading jobs..." minHeight="50vh" />
           ) : filtered.length === 0 ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '60px 24px',
-              background: '#fff',
-              borderRadius: 16,
-              border: '1px solid #E8E4F0',
-            }}>
-              <p style={{ fontSize: 48, marginBottom: 12, opacity: 0.5 }}>🔍</p>
-              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 6 }}>No jobs found</h3>
-              <p style={{ fontSize: 14, color: '#666' }}>Try adjusting your filters</p>
+            <div style={{ background: '#fff', border: '1px solid #E8E4F0', borderRadius: 16, padding: '60px 24px', textAlign: 'center' }}>
+              <div style={{ fontSize: 48, marginBottom: 14, opacity: 0.35 }}>🔍</div>
+              <h3 style={{ fontSize: 18, fontWeight: 700, marginBottom: 8 }}>No jobs found</h3>
+              <p style={{ fontSize: 14, color: '#7B7494', marginBottom: 16 }}>Try changing your filters or search term</p>
+              <button onClick={clearAll} style={{ padding: '9px 20px', background: '#7C3AED', color: '#fff', border: 'none', borderRadius: 10, fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+                Clear all filters
+              </button>
             </div>
           ) : (
-            <>
-              <div style={{ fontSize: 13, color: '#7B7494', marginBottom: 14 }}>
-                <strong style={{ color: '#0F0A1E' }}>{filtered.length}</strong> PHP jobs found
-              </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+              {filtered.map((job) => {
+                const deadline = daysUntilDeadline(job.expires_at)
+                return (
+                  <div key={job.id} style={{ background: '#fff', border: '1px solid #E8E4F0', borderRadius: 16, padding: '18px 20px', transition: 'all 0.15s' }}>
+                    <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
+                      <div style={{ width: 48, height: 48, borderRadius: 10, background: '#EDE9FE', color: '#5B21B6', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18, fontWeight: 800, flexShrink: 0 }}>
+                        {job.company_name?.charAt(0) || 'J'}
+                      </div>
 
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                {filtered.map(job => {
-                  const deadline = daysUntilDeadline(job.deadline_date)
-                  return (
-                    <div key={job.id} style={{
-                      background: '#fff',
-                      border: '1px solid #E8E4F0',
-                      borderRadius: 16,
-                      padding: '18px 20px',
-                      transition: 'all 0.15s',
-                    }}
-                      onMouseEnter={e => {
-                        (e.currentTarget as HTMLDivElement).style.borderColor = '#C4B5FD'
-                        ;(e.currentTarget as HTMLDivElement).style.boxShadow = '0 4px 16px rgba(91,33,182,0.06)'
-                      }}
-                      onMouseLeave={e => {
-                        (e.currentTarget as HTMLDivElement).style.borderColor = '#E8E4F0'
-                        ;(e.currentTarget as HTMLDivElement).style.boxShadow = 'none'
-                      }}
-                    >
-                      <div style={{ display: 'flex', gap: 14, alignItems: 'flex-start' }}>
-                        {/* Company logo */}
-                        <div style={{
-                          width: 48,
-                          height: 48,
-                          borderRadius: 10,
-                          background: '#EDE9FE',
-                          color: '#5B21B6',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: 18,
-                          fontWeight: 800,
-                          flexShrink: 0,
-                        }}>
-                          {job.company_name?.charAt(0) || 'J'}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12, marginBottom: 4 }}>
+                          <div>
+                            <Link href={`/jobs/${job.id}`} style={{ fontSize: 16, fontWeight: 700, color: '#0F0A1E', textDecoration: 'none' }}>
+                              {job.title}
+                            </Link>
+                            <div style={{ fontSize: 13, color: '#7B7494', marginTop: 2 }}>
+                              🏢 {job.company_name || 'Hiring company'} · 📍 {job.preferred_location || 'Remote'}
+                            </div>
+                          </div>
+                          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                            <div style={{ fontSize: 15, fontWeight: 700, color: '#7C3AED' }}>{formatBudget(job)}</div>
+                            <div style={{ fontSize: 11, color: '#7B7494', marginTop: 2 }}>{job.hire_type?.replace('_', ' ') || 'Freelance'}</div>
+                          </div>
                         </div>
 
-                        {/* Job info */}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'flex-start',
-                            gap: 12,
-                            marginBottom: 4,
-                          }}>
-                            <div>
-                              <Link href={`/jobs/${job.id}`} style={{
-                                fontSize: 16,
-                                fontWeight: 700,
-                                color: '#0F0A1E',
-                                textDecoration: 'none',
-                              }}>
-                                {job.title}
-                              </Link>
-                              <div style={{ fontSize: 13, color: '#7B7494', marginTop: 2 }}>
-                                🏢 {job.company_name} · 📍 {job.preferred_location || 'Remote'}
-                              </div>
-                            </div>
-                            <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                              <div style={{ fontSize: 15, fontWeight: 700, color: '#7C3AED' }}>
-                                {formatBudget(job)}
-                              </div>
-                              <div style={{ fontSize: 11, color: '#7B7494', marginTop: 2 }}>
-                                {job.hire_type?.replace('_', ' ') || 'Freelance'}
-                              </div>
-                            </div>
-                          </div>
+                        <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', margin: '10px 0' }}>
+                          {(job.required_skills || []).slice(0, 6).map((skill: string) => (
+                            <span key={skill} style={{ fontSize: 11, fontWeight: 500, padding: '3px 9px', borderRadius: 20, background: '#EDE9FE', color: '#5B21B6', border: '1px solid #C4B5FD' }}>
+                              {skill}
+                            </span>
+                          ))}
+                        </div>
 
-                          {/* Skills */}
-                          <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', margin: '10px 0' }}>
-                            {(job.required_skills || []).slice(0, 5).map((s: string) => (
-                              <span key={s} style={{
-                                fontSize: 11,
-                                fontWeight: 500,
-                                padding: '3px 9px',
-                                borderRadius: 20,
-                                background: '#EDE9FE',
-                                color: '#5B21B6',
-                                border: '1px solid #C4B5FD',
-                              }}>
-                                {s}
-                              </span>
-                            ))}
+                        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8 }}>
+                          <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#7B7494', flexWrap: 'wrap' }}>
+                            <span>⏰ {timeAgo(job.created_at)}</span>
+                            <span>⏳ <span style={{ color: deadline.color, fontWeight: 600 }}>{deadline.text}</span></span>
+                            <span>{job.remote_ok ? 'Remote-friendly' : 'Location based'}</span>
                           </div>
-
-                          {/* Footer row */}
-                          <div style={{
-                            display: 'flex',
-                            justifyContent: 'space-between',
-                            alignItems: 'center',
-                            flexWrap: 'wrap',
-                            gap: 8,
-                          }}>
-                            <div style={{ display: 'flex', gap: 14, fontSize: 12, color: '#7B7494' }}>
-                              <span>⏰ {timeAgo(job.created_at)}</span>
-                              <span>⏳ <span style={{ color: deadline.color, fontWeight: 600 }}>{deadline.text}</span></span>
-                            </div>
-                            <div style={{ display: 'flex', gap: 8 }}>
-                              <Link href={`/jobs/${job.id}`} style={{
-                                fontSize: 12,
-                                fontWeight: 500,
-                                padding: '7px 14px',
-                                borderRadius: 8,
-                                border: '1.5px solid #E8E4F0',
-                                background: '#fff',
-                                color: '#3D3558',
-                                textDecoration: 'none',
-                              }}>
-                                View Details
-                              </Link>
-                              <button
-                                onClick={() => handleApplyClick(job.id)}
-                                disabled={!!applying || appliedJobs.includes(job.id)}
-                                style={{
-                                  fontSize: 12,
-                                  fontWeight: 600,
-                                  padding: '7px 14px',
-                                  borderRadius: 8,
-                                  border: 'none',
-                                  background: appliedJobs.includes(job.id) ? '#D1FAE5' : '#7C3AED',
-                                  color: appliedJobs.includes(job.id) ? '#065F46' : '#fff',
-                                  cursor: appliedJobs.includes(job.id) ? 'default' : 'pointer',
-                                }}
-                              >
-                                {applying === job.id
-                                  ? 'Submitting...'
-                                  : appliedJobs.includes(job.id)
-                                  ? '✓ Applied'
-                                  : 'Apply Now'}
-                              </button>
-                            </div>
+                          <div style={{ display: 'flex', gap: 8 }}>
+                            <Link href={`/jobs/${job.id}`} style={{ fontSize: 12, fontWeight: 500, padding: '7px 14px', borderRadius: 8, border: '1.5px solid #E8E4F0', background: '#fff', color: '#3D3558', textDecoration: 'none' }}>
+                              View Details
+                            </Link>
+                            <button
+                              onClick={() => handleApplyClick(job.id)}
+                              disabled={!!applying || appliedJobs.includes(job.id)}
+                              style={{ fontSize: 12, fontWeight: 600, padding: '7px 14px', borderRadius: 8, border: 'none', background: appliedJobs.includes(job.id) ? '#D1FAE5' : '#7C3AED', color: appliedJobs.includes(job.id) ? '#065F46' : '#fff', cursor: appliedJobs.includes(job.id) ? 'default' : 'pointer' }}
+                            >
+                              {applying === job.id ? 'Submitting...' : appliedJobs.includes(job.id) ? 'Applied' : 'Apply Now'}
+                            </button>
                           </div>
                         </div>
                       </div>
                     </div>
-                  )
-                })}
-              </div>
-            </>
+                  </div>
+                )
+              })}
+            </div>
           )}
         </div>
       </div>
 
-      {/* Cover note modal */}
       {coverModal && (
-        <div style={{
-          position: 'fixed', inset: 0, zIndex: 500,
-          background: 'rgba(15,10,30,0.7)',
-          backdropFilter: 'blur(6px)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
-          padding: 20,
-        }}
-          onClick={e => e.target === e.currentTarget && setCoverModal(null)}
+        <div
+          style={{ position: 'fixed', inset: 0, zIndex: 500, background: 'rgba(15,10,30,0.7)', backdropFilter: 'blur(6px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20 }}
+          onClick={(e) => e.target === e.currentTarget && setCoverModal(null)}
         >
-          <div style={{
-            background: '#fff', borderRadius: 20, padding: 32,
-            maxWidth: 480, width: '100%',
-          }}>
-            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>
-              Apply for this job
-            </h3>
-            <p style={{ fontSize: 13, color: '#7B7494', marginBottom: 20 }}>
-              Add a cover note to stand out (optional but recommended)
-            </p>
+          <div style={{ background: '#fff', borderRadius: 20, padding: 32, maxWidth: 480, width: '100%' }}>
+            <h3 style={{ fontSize: 20, fontWeight: 800, marginBottom: 6 }}>Apply for this job</h3>
+            <p style={{ fontSize: 13, color: '#7B7494', marginBottom: 20 }}>Add a cover note to stand out (optional but recommended)</p>
             <textarea
               placeholder="Briefly explain your relevant PHP experience and why you are a great fit..."
               value={coverNote}
-              onChange={e => setCoverNote(e.target.value)}
-              style={{
-                width: '100%', minHeight: 120,
-                padding: '10px 14px',
-                border: '1.5px solid #E8E4F0',
-                borderRadius: 10, fontSize: 14,
-                outline: 'none', resize: 'vertical',
-                fontFamily: 'inherit',
-                marginBottom: 16,
-              }}
+              onChange={(e) => setCoverNote(e.target.value)}
+              style={{ width: '100%', minHeight: 120, padding: '10px 14px', border: '1.5px solid #E8E4F0', borderRadius: 10, fontSize: 14, outline: 'none', resize: 'vertical', fontFamily: 'inherit', marginBottom: 16 }}
             />
             <div style={{ display: 'flex', gap: 10 }}>
-              <button
-                onClick={() => setCoverModal(null)}
-                style={{
-                  flex: 1, padding: '12px',
-                  border: '1.5px solid #E8E4F0',
-                  borderRadius: 10, background: '#fff',
-                  fontSize: 14, fontWeight: 500,
-                  cursor: 'pointer', color: '#3D3558',
-                }}
-              >
+              <button onClick={() => setCoverModal(null)} style={{ flex: 1, padding: '12px', border: '1.5px solid #E8E4F0', borderRadius: 10, background: '#fff', fontSize: 14, fontWeight: 500, cursor: 'pointer', color: '#3D3558' }}>
                 Cancel
               </button>
-              <button
-                onClick={submitApplication}
-                disabled={!!applying}
-                style={{
-                  flex: 2, padding: '12px',
-                  border: 'none', borderRadius: 10,
-                  background: '#7C3AED', color: '#fff',
-                  fontSize: 14, fontWeight: 700,
-                  cursor: 'pointer',
-                }}
-              >
+              <button onClick={submitApplication} disabled={!!applying} style={{ flex: 2, padding: '12px', border: 'none', borderRadius: 10, background: '#7C3AED', color: '#fff', fontSize: 14, fontWeight: 700, cursor: 'pointer' }}>
                 {applying ? 'Submitting...' : 'Submit Application →'}
               </button>
             </div>
@@ -541,7 +454,6 @@ export default function BrowseJobsPage() {
         </div>
       )}
 
-      {/* Payment modal */}
       {showPayment && (
         <PaymentModal
           purpose="job_seeker_pro"
@@ -553,20 +465,21 @@ export default function BrowseJobsPage() {
         />
       )}
 
-      {/* Toast */}
       {toast && (
-        <div style={{
-          position: 'fixed', bottom: 24, right: 24,
-          background: '#0F0A1E', color: '#fff',
-          padding: '12px 20px', borderRadius: 10,
-          fontSize: 14, zIndex: 1000,
-          boxShadow: '0 8px 32px rgba(0,0,0,0.2)',
-        }}>
+        <div style={{ position: 'fixed', bottom: 24, right: 24, background: '#0F0A1E', color: '#fff', padding: '12px 20px', borderRadius: 10, fontSize: 14, zIndex: 1000, boxShadow: '0 8px 32px rgba(0,0,0,0.2)' }}>
           {toast}
         </div>
       )}
 
       <Footer />
     </>
+  )
+}
+
+export default function BrowseJobsPage() {
+  return (
+    <Suspense>
+      <BrowseJobsContent />
+    </Suspense>
   )
 }

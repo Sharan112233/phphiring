@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import PageLoader from '@/components/ui/PageLoader'
 
 interface Talent {
   id: string
@@ -554,9 +555,7 @@ export default function BrowseContent() {
     return (
       <>
         <Navbar />
-        <div style={{ padding: '40px 24px', textAlign: 'center' }}>
-          <p>Loading talent...</p>
-        </div>
+        <PageLoader label="Loading talent..." minHeight="70vh" />
         <Footer />
       </>
     )

@@ -1,8 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 
-// Only protect dashboard routes
-// post-job checks auth client-side itself
-const PROTECTED = ['/dashboard', '/notifications']
+const PROTECTED = ['/dashboard', '/notifications', '/post-job']
 
 export function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl
@@ -21,5 +19,5 @@ export function middleware(req: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/dashboard/:path*', '/notifications/:path*'],
+  matcher: ['/dashboard/:path*', '/notifications/:path*', '/post-job'],
 }

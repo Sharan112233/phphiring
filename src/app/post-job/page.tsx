@@ -1,10 +1,11 @@
 'use client'
 // src/app/post-job/page.tsx
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '../../components/layout/Footer'
 import PaymentModal from '@/components/ui/PaymentModal'
+import PageLoader from '@/components/ui/PageLoader'
 import styles from './post-job.module.css'
 
 const PHP_SKILLS = [
@@ -13,9 +14,12 @@ const PHP_SKILLS = [
   'Odoo','EspoCRM','MySQL','PostgreSQL','Redis','Vue.js','React','Docker','AWS','REST API','GraphQL'
 ]
 
+const MAX_BUDGET_LIMIT = 99999999
+
 export default function PostJobPage() {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
+  const [checkingAccess, setCheckingAccess] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState(false)
   const [showPayment, setShowPayment] = useState(false)
@@ -38,22 +42,67 @@ export default function PostJobPage() {
     deadline_date: '', // ADD THIS
   })
 
+  useEffect(() => {
+    const verifyAccess = async () => {
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!res.ok) {
+          router.replace('/auth/login?redirect=/post-job')
+          return
+        }
+
+        const data = await res.json()
+        localStorage.setItem('phphire_user', JSON.stringify(data.user))
+
+        if (data.user?.user_type !== 'recruiter') {
+          router.replace('/dashboard')
+          return
+        }
+      } catch {
+        router.replace('/auth/login?redirect=/post-job')
+        return
+      } finally {
+        setCheckingAccess(false)
+      }
+    }
+
+    verifyAccess()
+  }, [router])
+
   function toggleSkill(skill: string) {
     setSelectedSkills(prev => prev.includes(skill) ? prev.filter(s => s !== skill) : [...prev, skill])
   }
 
+  function handleBudgetChange(field: 'budget_min' | 'budget_max', value: string) {
+    const digitsOnly = value.replace(/[^\d]/g, '').slice(0, String(MAX_BUDGET_LIMIT).length)
+    setForm(prev => ({ ...prev, [field]: digitsOnly }))
+  }
+
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault()
-    setLoading(true)
     setError('')
 
-    // Client side auth check
-    const stored = localStorage.getItem('phphire_user')
-    if (!stored) {
-      router.push('/auth/login')
+    const budgetMin = form.budget_min ? Number(form.budget_min) : null
+    const budgetMax = form.budget_max ? Number(form.budget_max) : null
+
+    if (budgetMin !== null && budgetMin > MAX_BUDGET_LIMIT) {
+      setError(`Minimum budget cannot be more than ${MAX_BUDGET_LIMIT}.`)
       return
     }
 
+    if (budgetMax !== null && budgetMax > MAX_BUDGET_LIMIT) {
+      setError(`Maximum budget cannot be more than ${MAX_BUDGET_LIMIT}.`)
+      return
+    }
+
+    if (budgetMin !== null && budgetMax !== null && budgetMin > budgetMax) {
+      setError('Minimum budget cannot be greater than maximum budget.')
+      return
+    }
+
+    setLoading(true)
+
+    // Client side auth check
     try {
       const res = await fetch('/api/jobs', {
         method: 'POST',
@@ -87,6 +136,16 @@ export default function PostJobPage() {
   function onPaymentSuccess() {
     setShowPayment(false)
     handleSubmit({ preventDefault: () => {} } as React.FormEvent)
+  }
+
+  if (checkingAccess) {
+    return (
+      <>
+        <Navbar />
+        <PageLoader label="Checking recruiter access..." minHeight="75vh" />
+        <Footer />
+      </>
+    )
   }
 
   if (success) {
@@ -197,11 +256,11 @@ export default function PostJobPage() {
                 <div className="form-row">
                   <div className="form-group">
                     <label className="form-label">Min Budget (USD/₹)</label>
-                    <input className="form-input" type="number" placeholder="e.g. 500" value={form.budget_min} onChange={e => setForm({...form,budget_min:e.target.value})} />
+                    <input className="form-input" type="number" min={0} max={MAX_BUDGET_LIMIT} step="1" inputMode="numeric" placeholder="e.g. 500" value={form.budget_min} onChange={e => handleBudgetChange('budget_min', e.target.value)} />
                   </div>
                   <div className="form-group">
                     <label className="form-label">Max Budget (USD/₹)</label>
-                    <input className="form-input" type="number" placeholder="e.g. 2000" value={form.budget_max} onChange={e => setForm({...form,budget_max:e.target.value})} />
+                    <input className="form-input" type="number" min={0} max={MAX_BUDGET_LIMIT} step="1" inputMode="numeric" placeholder="e.g. 2000" value={form.budget_max} onChange={e => handleBudgetChange('budget_max', e.target.value)} />
                   </div>
                 </div>
               </div>

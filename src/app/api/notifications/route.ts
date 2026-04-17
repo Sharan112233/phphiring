@@ -1,38 +1,57 @@
-import { createClient } from '@supabase/supabase-js'
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionUser } from '@/lib/auth'
+import { createNotification } from '@/lib/notifications'
+import { getSupabaseAdmin } from '@/lib/supabase'
 
-const supabaseAdmin = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY!
-)
+export async function GET(req: NextRequest) {
+  try {
+    const sessionUser = getSessionUser(req)
+    const { searchParams } = new URL(req.url)
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 20), 1), 100)
+
+    if (!sessionUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const supabase = getSupabaseAdmin()
+    const { data: notifications, error } = await supabase
+      .from('notifications')
+      .select('id, type, title, message, is_read, link, created_at')
+      .eq('user_id', sessionUser.userId)
+      .order('created_at', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('Notifications fetch error:', error)
+      // Table may not exist yet — return empty gracefully
+      return NextResponse.json({ success: true, notifications: [], unread_count: 0 })
+    }
+
+    return NextResponse.json({
+      success: true,
+      notifications: notifications || [],
+      unread_count: (notifications || []).filter((n) => !n.is_read).length,
+    })
+  } catch (error: any) {
+    return NextResponse.json({ error: error.message || 'Failed to fetch notifications' }, { status: 500 })
+  }
+}
 
 export async function POST(req: NextRequest) {
   try {
+    const sessionUser = getSessionUser(req)
+    if (!sessionUser) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const body = await req.json()
+    if (!body.user_id || !body.type || !body.title || !body.message) {
+      return NextResponse.json({ error: 'Missing notification fields' }, { status: 400 })
+    }
 
-    // Create the notification
-    const { error } = await supabaseAdmin
-      .from('notifications')
-      .insert({
-        user_id: body.user_id,
-        type: 'job_posted',
-        title: `New Job: ${body.job_title}`,
-        message: `${body.company_name} posted a new job: ${body.job_title}`,
-        is_read: false,
-        job_id: body.job_id,
-      })
-
-    if (error) throw error
-
-    return NextResponse.json(
-      { message: 'Notification sent' },
-      { status: 201 }
-    )
+    await createNotification(body.user_id, body.type, body.title, body.message, body.link)
+    return NextResponse.json({ message: 'Notification sent' }, { status: 201 })
   } catch (error: any) {
-    console.error('Error:', error)
-    return NextResponse.json(
-      { error: error.message },
-      { status: 400 }
-    )
+    return NextResponse.json({ error: error.message || 'Failed to send notification' }, { status: 400 })
   }
 }

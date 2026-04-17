@@ -50,12 +50,28 @@ export default function Navbar() {
   const menuRef  = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
-    const stored = localStorage.getItem('phphire_user')
-    if (stored) {
-      try { setUser(JSON.parse(stored)) } catch {
-        localStorage.removeItem('phphire_user')
+    const syncUser = async () => {
+      const stored = localStorage.getItem('phphire_user')
+      if (stored) {
+        try { setUser(JSON.parse(stored)) } catch {
+          localStorage.removeItem('phphire_user')
+        }
       }
+
+      try {
+        const res = await fetch('/api/auth/me')
+        if (!res.ok) {
+          localStorage.removeItem('phphire_user')
+          setUser(null)
+          return
+        }
+        const data = await res.json()
+        localStorage.setItem('phphire_user', JSON.stringify(data.user))
+        setUser(data.user)
+      } catch {}
     }
+
+    syncUser()
   }, [pathname])
 
   useEffect(() => {
@@ -89,6 +105,8 @@ export default function Navbar() {
 
   async function fetchNotifications() {
     try {
+      if (!user?.id) return
+
       const res = await fetch('/api/notifications?limit=8')
       if (res.ok) {
         const data = await res.json()
@@ -128,8 +146,12 @@ export default function Navbar() {
     } catch {}
     localStorage.removeItem('phphire_user')
     setUser(null)
+    setNotifications([])
+    setUnreadCount(0)
     setMenuOpen(false)
-    router.push('/')
+    setNotifOpen(false)
+    router.replace('/')
+    router.refresh()
   }
 
   function timeAgo(dateStr: string) {

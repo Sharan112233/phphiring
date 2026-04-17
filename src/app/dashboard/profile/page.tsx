@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Navbar from '@/components/layout/Navbar'
 import Footer from '@/components/layout/Footer'
+import PageLoader from '@/components/ui/PageLoader'
 import { colors, spacing, typography, borderRadius } from '@/lib/design-system'
 
 const AVAILABLE_SKILLS = [
@@ -39,6 +40,8 @@ interface ProfileData {
   skills?: string[]
   languages?: string[]
   hourly_rate_usd?: number
+  php_years?: number
+  total_jobs?: number
   availability?: string
   portfolio_url?: string
   github_url?: string
@@ -64,6 +67,8 @@ export default function ProfilePage() {
     skills: [],
     languages: [],
     hourly_rate_usd: 0,
+    php_years: 0,
+    total_jobs: 0,
     availability: 'available',
     portfolio_url: '',
     github_url: '',
@@ -171,9 +176,7 @@ export default function ProfilePage() {
     return (
       <>
         <Navbar />
-        <div style={{ padding: spacing.section, textAlign: 'center' }}>
-          <p>Loading profile...</p>
-        </div>
+        <PageLoader label="Loading profile..." minHeight="70vh" />
         <Footer />
       </>
     )
@@ -396,6 +399,68 @@ export default function ProfilePage() {
                   }}
                 />
                 <span style={{ fontSize: typography.bodyLarge.fontSize }}>/hour</span>
+              </div>
+            </div>
+
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: '1fr 1fr',
+              gap: spacing.lg,
+              marginBottom: spacing.lg,
+            }}>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: typography.label.fontSize,
+                  fontWeight: 600,
+                  marginBottom: spacing.md,
+                  color: colors.textPrimary,
+                }}>
+                  PHP Experience (Years)
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 5"
+                  value={formData.php_years || ''}
+                  onChange={e => handleInputChange('php_years', parseInt(e.target.value || '0', 10))}
+                  style={{
+                    width: '100%',
+                    padding: spacing.lg,
+                    border: `1.5px solid ${colors.borderLight}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: typography.body.fontSize,
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                />
+              </div>
+              <div>
+                <label style={{
+                  display: 'block',
+                  fontSize: typography.label.fontSize,
+                  fontWeight: 600,
+                  marginBottom: spacing.md,
+                  color: colors.textPrimary,
+                }}>
+                  Jobs Completed
+                </label>
+                <input
+                  type="number"
+                  min="0"
+                  placeholder="e.g. 24"
+                  value={formData.total_jobs || ''}
+                  onChange={e => handleInputChange('total_jobs', parseInt(e.target.value || '0', 10))}
+                  style={{
+                    width: '100%',
+                    padding: spacing.lg,
+                    border: `1.5px solid ${colors.borderLight}`,
+                    borderRadius: borderRadius.md,
+                    fontSize: typography.body.fontSize,
+                    fontFamily: 'inherit',
+                    boxSizing: 'border-box',
+                  }}
+                />
               </div>
             </div>
 

@@ -1,21 +1,21 @@
-# PHPhire — PHP Talent Marketplace
+# PHPhire
 
-The world's only PHP-first talent marketplace. Connect businesses
-with verified PHP experts filtered by framework, CRM, stack,
-location and more.
+The world's only PHP talent marketplace. Connect businesses with verified PHP experts filtered by framework, CRM, stack, location and more.
 
 ---
 
 ## Tech Stack
 
-- **Framework** — Next.js 14 (App Router)
-- **Language** — TypeScript
-- **Database** — Supabase (PostgreSQL)
-- **Auth** — Custom JWT with HTTP-only cookies
-- **Payments** — Razorpay (UPI, Cards, Net Banking)
-- **Email** — Nodemailer with Gmail App Password
-- **Styling** — Pure CSS (no Tailwind)
-- **Hosting** — Vercel (recommended)
+| Layer | Technology |
+|-------|-----------|
+| Framework | Next.js 14 (App Router) |
+| Language | TypeScript |
+| Database | Supabase (PostgreSQL) |
+| Auth | Custom JWT with HTTP-only cookies |
+| Payments | Razorpay (UPI, Cards, Net Banking) |
+| Email | Nodemailer with Gmail App Password |
+| Styling | Pure CSS (no Tailwind) |
+| Hosting | Vercel (recommended) |
 
 ---
 
@@ -24,22 +24,34 @@ location and more.
 ### For PHP Developers
 - Create a verified PHP-only profile
 - Browse and apply to PHP jobs
-- Track application status
+- Track application status in dashboard
 - Upgrade to Pro for unlimited applications
 
 ### For Recruiters
 - Post PHP job listings
 - Browse verified PHP talent
-- Manage applications — shortlist, select, reject
+- Hiring pipeline — manage applications (shortlist, select, reject)
+- Real-time notifications when developers apply
 - Contact PHP agencies
 
 ### General
 - Role-based experience — separate UI for talent and recruiters
 - OTP email verification on signup
 - Forgot password with OTP reset flow
-- Razorpay payment integration
+- Razorpay payment integration (UPI, cards, net banking)
 - Notifications system
 - PHP Resources page
+
+---
+
+## Plans and Pricing
+
+| Plan | Price | For |
+|------|-------|-----|
+| Free | ₹0 | 10 applications or 3 job posts/month |
+| Job Seeker Pro | ₹99/month | Unlimited applications |
+| Recruiter Pro | ₹99/month | Unlimited job postings |
+| Featured Profile | ₹199/30 days | 3x profile visibility |
 
 ---
 
@@ -47,17 +59,22 @@ location and more.
 
 ### 1. Clone the repository
 
+```bash
 git clone https://github.com/yourusername/phphire.git
 cd phphire
+```
 
 ### 2. Install dependencies
 
+```bash
 npm install
+```
 
 ### 3. Set up environment variables
 
-Create a `.env.local` file in the root of the project:
+Create a `.env.local` file in the root:
 
+```env
 NEXT_PUBLIC_APP_URL=http://localhost:3000
 
 # Supabase
@@ -68,7 +85,7 @@ SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
 # JWT
 JWT_SECRET=your_random_secret_key_minimum_32_characters
 
-# Gmail (for sending OTP emails)
+# Gmail
 GMAIL_USER=your_gmail_address@gmail.com
 GMAIL_APP_PASSWORD=your_gmail_app_password
 
@@ -76,29 +93,37 @@ GMAIL_APP_PASSWORD=your_gmail_app_password
 RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxxxx
 RAZORPAY_KEY_SECRET=xxxxxxxxxxxxxxxxxxxxxxxx
 NEXT_PUBLIC_RAZORPAY_KEY_ID=rzp_test_xxxxxxxxxxxxxxx
+```
 
 ### 4. Set up the database
 
-- Go to your Supabase project
-- Open SQL Editor
+- Go to your Supabase project → SQL Editor
 - Run the contents of `supabase-schema.sql`
+- Then run these additional migration statements:
+
+```sql
+alter table notifications add column if not exists link text;
+alter table notifications add column if not exists meta jsonb;
+```
 
 ### 5. Run the development server
 
+```bash
 npm run dev
+```
 
-Open http://localhost:3000 in your browser.
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## Environment Variables Guide
+## Environment Variables
 
 | Variable | Where to get it |
 |----------|----------------|
 | `NEXT_PUBLIC_SUPABASE_URL` | Supabase → Settings → API |
 | `NEXT_PUBLIC_SUPABASE_ANON_KEY` | Supabase → Settings → API |
 | `SUPABASE_SERVICE_ROLE_KEY` | Supabase → Settings → API |
-| `JWT_SECRET` | Any random string — use https://generate-secret.vercel.app/32 |
+| `JWT_SECRET` | Any random string — [generate one here](https://generate-secret.vercel.app/32) |
 | `GMAIL_USER` | Your Gmail address |
 | `GMAIL_APP_PASSWORD` | Gmail → Settings → Security → App Passwords |
 | `RAZORPAY_KEY_ID` | Razorpay Dashboard → Settings → API Keys |
@@ -109,65 +134,31 @@ Open http://localhost:3000 in your browser.
 ## Gmail App Password Setup
 
 1. Go to your Google Account → Security
-2. Enable 2-Step Verification if not already enabled
+2. Enable 2-Step Verification
 3. Go to Security → App Passwords
-4. Select app: Mail, Select device: Other
-5. Type PHPhire and click Generate
-6. Copy the 16-character password into `GMAIL_APP_PASSWORD`
+4. Select app: Mail, device: Other → type `PHPhire`
+5. Copy the 16-character password into `GMAIL_APP_PASSWORD`
 
 ---
 
-## Deploying to Vercel
-
-### 1. Push to GitHub
-
-git init
-git add .
-git commit -m "Initial commit"
-git remote add origin https://github.com/yourusername/phphire.git
-git push -u origin main
-
-### 2. Deploy on Vercel
-
-- Go to https://vercel.com
-- Click New Project
-- Import your GitHub repository
-- Add all environment variables from `.env.local`
-- Change `NEXT_PUBLIC_APP_URL` to your Vercel domain
-- Click Deploy
-
-### 3. After deployment
-
-- Update `NEXT_PUBLIC_APP_URL` to your live domain
-- In Razorpay dashboard — add your Vercel domain to allowed origins
-- Switch from test keys to live keys when ready
-
----
-```bash
 ## Project Structure
 
+```
 phphire/
 ├── src/
 │   ├── app/
 │   │   ├── api/
-│   │   │   ├── auth/
-│   │   │   │   ├── login/
-│   │   │   │   ├── logout/
-│   │   │   │   ├── register/
-│   │   │   │   ├── verify-otp/
-│   │   │   │   ├── resend-otp/
-│   │   │   │   ├── reset-password/
-│   │   │   │   └── me/
-│   │   │   ├── jobs/
-│   │   │   ├── talent/
-│   │   │   ├── applications/
-│   │   │   ├── notifications/
-│   │   │   ├── payments/
-│   │   │   └── profile/
+│   │   │   ├── auth/          # login, register, verify-otp, reset-password, me
+│   │   │   ├── jobs/          # list, create, [id], apply
+│   │   │   ├── applications/  # list, update status
+│   │   │   ├── talent/        # browse talent, [id]
+│   │   │   ├── agencies/      # agency listings
+│   │   │   ├── notifications/ # list, mark-read
+│   │   │   └── payments/      # create-order, verify
 │   │   ├── auth/login/
 │   │   ├── browse/
 │   │   ├── dashboard/
-│   │   │   ├── applications/
+│   │   │   ├── applications/  # hiring pipeline / my applications
 │   │   │   ├── payments/
 │   │   │   └── profile/
 │   │   ├── jobs/[id]/
@@ -176,78 +167,83 @@ phphire/
 │   │   ├── notifications/
 │   │   ├── post-job/
 │   │   ├── resources/
-│   │   ├── join/
-│   │   ├── layout.tsx
-│   │   └── page.tsx
+│   │   └── join/
 │   ├── components/
-│   │   ├── layout/
-│   │   │   ├── Navbar.tsx
-│   │   │   └── Footer.tsx
-│   │   └── ui/
-│   │       └── PaymentModal.tsx
+│   │   ├── layout/            # Navbar, Footer
+│   │   └── ui/                # PageLoader, PaymentModal
 │   ├── lib/
-│   │   ├── auth.ts
-│   │   ├── email.ts
-│   │   ├── notifications.ts
-│   │   ├── razorpay.ts
-│   │   └── supabase.ts
-│   ├── styles/
-│   │   └── globals.css
-│   └── types/
-│       └── index.ts
-├── middleware.ts
-├── next.config.js
-├── tsconfig.json
+│   │   ├── auth.ts            # JWT, bcrypt, session cookie
+│   │   ├── email.ts           # Nodemailer OTP emails
+│   │   ├── notifications.ts   # createNotification helper
+│   │   ├── razorpay.ts        # Razorpay order helpers
+│   │   └── supabase.ts        # Supabase client + admin client
+│   ├── styles/globals.css
+│   └── types/index.ts
+├── middleware.ts               # Route protection
 ├── supabase-schema.sql
-├── .env.local          ← never commit this
-├── .gitignore
-└── README.md
+└── .env.local                  ← never commit this
 ```
+
 ---
 
 ## User Roles
 
 ### Talent (PHP Developer)
-- Registers as Developer
+- Registers as **Developer**
 - Completes PHP-only profile
 - Applies to jobs (10/month free, unlimited on Pro)
-- Tracks applications
+- Tracks application status — pending, shortlisted, selected, rejected
 
 ### Recruiter (Business / Hiring)
-- Registers as Hiring
+- Registers as **Hiring**
 - Posts jobs (3/month free, unlimited on Pro)
-- Browses PHP talent
-- Manages received applications
+- Views hiring pipeline with all posted jobs
+- Manages incoming applications — shortlist, select, reject
+- Gets notified when a developer applies
 
 ---
 
-## Plans and Pricing
+## Deploying to Vercel
 
-| Plan | Price | For |
-|------|-------|-----|
-| Free | Rs.0 | 10 applications or 3 job posts per month |
-| Job Seeker Pro | Rs.99/month | Unlimited applications |
-| Recruiter Pro | Rs.99/month | Unlimited job postings |
-| Featured Profile | Rs.199/30 days | 3x profile visibility |
+```bash
+# Push to GitHub
+git init
+git add .
+git commit -m "Initial commit"
+git remote add origin https://github.com/yourusername/phphire.git
+git push -u origin main
+```
+
+- Go to [vercel.com](https://vercel.com) → New Project → Import your repo
+- Add all environment variables from `.env.local`
+- Set `NEXT_PUBLIC_APP_URL` to your Vercel domain
+- Click Deploy
+
+After deployment:
+- Update `NEXT_PUBLIC_APP_URL` to your live domain
+- Add your Vercel domain to allowed origins in Razorpay dashboard
+- Switch from test keys to live keys when ready
 
 ---
 
 ## Scripts
 
-npm run dev        # Start development server
-npm run build      # Build for production
-npm run start      # Start production server
-npm run lint       # Run ESLint
+```bash
+npm run dev      # Start development server
+npm run build    # Build for production
+npm run start    # Start production server
+npm run lint     # Run ESLint
+```
 
 ---
 
 ## License
 
-MIT License — feel free to use and modify for your own projects.
+MIT License — free to use and modify for your own projects.
 
 ---
 
 ## Contact
 
-Built with PHP for the PHP community.
-For support or questions open an issue on GitHub.
+Built with ❤️ for the PHP community.  
+For support or questions, open an issue on GitHub.

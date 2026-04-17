@@ -1,10 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSessionUser } from '@/lib/auth'
 import { getSupabaseAdmin } from '@/lib/supabase'
-import { createNotification } from '@/lib/notifications'
 
 export async function GET(req: NextRequest) {
   try {
+    const sessionUser = getSessionUser(req)
     const { searchParams } = new URL(req.url)
     const q = searchParams.get('q') || ''
     const page = parseInt(searchParams.get('page') || '1')
@@ -13,10 +13,22 @@ export async function GET(req: NextRequest) {
     const location = searchParams.get('location') || ''
     const budgetType = searchParams.get('budget_type') || ''
     const hireType = searchParams.get('hire_type') || ''
+    const posterId = searchParams.get('poster_id') || ''
+    const status = searchParams.get('status') || ''
     const skills = searchParams.getAll('skill')
     const sortBy = searchParams.get('sort') || 'newest'
 
     const supabase = getSupabaseAdmin()
+
+    // When fetching a recruiter's own posted jobs, validate session first
+    if (posterId) {
+      if (!sessionUser || sessionUser.user_type !== 'recruiter') {
+        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+      }
+      if (posterId !== sessionUser.userId) {
+        return NextResponse.json({ error: 'You can only view your own posted jobs' }, { status: 403 })
+      }
+    }
 
     let query = supabase
       .from('jobs')
@@ -30,8 +42,14 @@ export async function GET(req: NextRequest) {
         `,
         { count: 'exact' }
       )
-      .eq('status', 'open')
-      .gt('expires_at', new Date().toISOString())
+
+    if (posterId) {
+      // Show ALL jobs posted by this recruiter (any status, any expiry)
+      query = query.eq('poster_id', sessionUser!.userId)
+    } else {
+      // Public listing — only open, non-expired, non-draft jobs
+      query = query.not('status', 'eq', 'draft').eq('status', 'open').gt('expires_at', new Date().toISOString())
+    }
 
     // Full text search on title + description
     if (q) {
@@ -58,6 +76,10 @@ export async function GET(req: NextRequest) {
     // Skills filter — job must contain at least one of these skills
     if (skills.length > 0) {
       query = query.overlaps('required_skills', skills)
+    }
+
+    if (status && !posterId) {
+      query = query.eq('status', status)
     }
 
     // Sort
@@ -183,7 +205,17 @@ export async function POST(req: NextRequest) {
       required_language,
       contact_email,
       contact_name,
+      deadline_date,
     } = body
+    const parsedBudgetMin =
+      budget_min === '' || budget_min === null || budget_min === undefined
+        ? null
+        : Number(budget_min)
+    const parsedBudgetMax =
+      budget_max === '' || budget_max === null || budget_max === undefined
+        ? null
+        : Number(budget_max)
+    const maxBudgetLimit = 99999999
 
     // Required field validation
     if (!title || !description) {
@@ -207,7 +239,30 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const expiresAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // 30 days
+    if (parsedBudgetMin !== null && (!Number.isFinite(parsedBudgetMin) || parsedBudgetMin < 0 || parsedBudgetMin > maxBudgetLimit)) {
+      return NextResponse.json(
+        { error: `Minimum budget must be between 0 and ${maxBudgetLimit}` },
+        { status: 400 }
+      )
+    }
+
+    if (parsedBudgetMax !== null && (!Number.isFinite(parsedBudgetMax) || parsedBudgetMax < 0 || parsedBudgetMax > maxBudgetLimit)) {
+      return NextResponse.json(
+        { error: `Maximum budget must be between 0 and ${maxBudgetLimit}` },
+        { status: 400 }
+      )
+    }
+
+    if (parsedBudgetMin !== null && parsedBudgetMax !== null && parsedBudgetMin > parsedBudgetMax) {
+      return NextResponse.json(
+        { error: 'Minimum budget cannot be greater than maximum budget' },
+        { status: 400 }
+      )
+    }
+
+    const expiresAt = deadline_date
+      ? new Date(deadline_date)
+      : new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
 
     const { data: job, error: insertError } = await supabase
       .from('jobs')
@@ -217,8 +272,8 @@ export async function POST(req: NextRequest) {
         description: description.trim(),
         company_name: company_name?.trim() || null,
         budget_type: budget_type || 'fixed',
-        budget_min: budget_min ? parseFloat(budget_min) : null,
-        budget_max: budget_max ? parseFloat(budget_max) : null,
+        budget_min: parsedBudgetMin,
+        budget_max: parsedBudgetMax,
         duration: duration || null,
         hire_type: hire_type || 'freelance',
         required_skills: required_skills || [],

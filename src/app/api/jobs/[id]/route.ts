@@ -12,9 +12,10 @@ export async function GET(
       .from('jobs')
       .select(`
         id, title, description, company_name, company_logo,
-        budget_type, budget_min, budget_max, duration, hire_type,
+        poster_id, budget_type, budget_min, budget_max, duration, hire_type,
         required_skills, preferred_location, remote_ok,
         required_language, status, expires_at, created_at,
+        contact_email, contact_name,
         poster:users!poster_id(id, full_name, avatar_url, email)
       `)
       .eq('id', params.id)

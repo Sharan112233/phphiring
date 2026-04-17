@@ -1,223 +1,193 @@
-// src/app/api/talent/route.ts
 import { NextRequest, NextResponse } from 'next/server'
+import { getSessionUser } from '@/lib/auth'
+import { getSupabaseAdmin } from '@/lib/supabase'
+
+function normalizeTalent(profile: Record<string, any>, user?: Record<string, any>) {
+  const fullName = user?.full_name || 'Unknown Developer'
+  const initials = fullName
+    .split(' ')
+    .map((part: string) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase() || 'PD'
+
+  const avatarColors = [
+    { bg: '#EDE9FE', text: '#5B21B6' },
+    { bg: '#DBEAFE', text: '#1E40AF' },
+    { bg: '#D1FAE5', text: '#065F46' },
+    { bg: '#FEF3C7', text: '#92400E' },
+    { bg: '#FCE7F3', text: '#9D174D' },
+    { bg: '#ECFDF5', text: '#064E3B' },
+  ]
+
+  const colorIndex = (profile.user_id?.charCodeAt(0) || 0) % avatarColors.length
+  const colors = avatarColors[colorIndex]
+
+  return {
+    id: profile.user_id,
+    user_id: profile.user_id,
+    full_name: fullName,
+    email: user?.email || '',
+    initials,
+    avatarBg: colors.bg,
+    avatarTc: colors.text,
+    headline: profile.headline || 'PHP Developer',
+    bio: profile.bio || '',
+    location_city: profile.location_city || 'Remote',
+    location_country: profile.location_country || '',
+    location: [profile.location_city, profile.location_country].filter(Boolean).join(', '),
+    hourly_rate_usd: profile.hourly_rate_usd || 0,
+    php_years: profile.php_years || 0,
+    avg_rating: profile.avg_rating || 0,
+    total_reviews: profile.total_reviews || 0,
+    total_jobs: profile.total_jobs || 0,
+    profile_views: profile.profile_views || 0,
+    availability: profile.availability || 'available',
+    hire_types: Array.isArray(profile.hire_types) ? profile.hire_types : ['freelance'],
+    is_verified: Boolean(profile.is_verified),
+    is_featured: Boolean(profile.is_featured),
+    languages: Array.isArray(profile.languages) ? profile.languages : ['English'],
+    skills: Array.isArray(profile.skills) ? profile.skills : [],
+    php_versions: Array.isArray(profile.php_versions) ? profile.php_versions : [],
+    portfolio_url: profile.portfolio_url || '',
+    github_url: profile.github_url || '',
+    linkedin_url: profile.linkedin_url || '',
+    remote_ok: profile.remote_ok !== false,
+    type: 'individual',
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const apiKey = process.env.SUPABASE_SERVICE_KEY
+    const { searchParams } = new URL(req.url)
+    const q = (searchParams.get('q') || '').trim().toLowerCase()
+    const availability = searchParams.get('availability') || ''
+    const skillFilters = searchParams.getAll('skill')
+    const limit = Math.min(Math.max(Number(searchParams.get('limit') || 100), 1), 100)
 
-    if (!baseUrl || !apiKey) {
-      return NextResponse.json({ talent: [], total: 0, page: 1, limit: 100 })
+    const supabase = getSupabaseAdmin()
+    const { data: profiles, error } = await supabase
+      .from('talent_profiles')
+      .select(
+        `
+        *,
+        user:users!user_id(id, full_name, email, user_type, is_email_verified)
+      `
+      )
+      .eq('is_active', true)
+      .order('is_featured', { ascending: false })
+      .order('avg_rating', { ascending: false })
+      .limit(limit)
+
+    if (error) {
+      console.error('GET /api/talent error:', error)
+      return NextResponse.json({ error: 'Failed to fetch talent' }, { status: 500 })
     }
 
-    // Fetch talent profiles
-    const profileUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-    profileUrl.searchParams.set('select', '*')
-    profileUrl.searchParams.set('order', 'created_at.desc')
-    profileUrl.searchParams.set('limit', '100')
+    let talent = (profiles || [])
+      .filter((profile: any) => profile.user?.user_type === 'talent' && profile.user?.is_email_verified)
+      .map((profile: any) => normalizeTalent(profile, profile.user))
 
-    const profileResponse = await fetch(profileUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    })
-
-    if (!profileResponse.ok) {
-      return NextResponse.json({ talent: [], total: 0, page: 1, limit: 100 })
+    if (q) {
+      talent = talent.filter((item) =>
+        item.full_name.toLowerCase().includes(q) ||
+        item.headline.toLowerCase().includes(q) ||
+        item.bio.toLowerCase().includes(q) ||
+        item.location.toLowerCase().includes(q) ||
+        item.skills.some((skill: string) => skill.toLowerCase().includes(q))
+      )
     }
 
-    const profiles = await profileResponse.json()
-
-    if (!Array.isArray(profiles) || profiles.length === 0) {
-      return NextResponse.json({ talent: [], total: 0, page: 1, limit: 100 })
+    if (availability && availability !== 'all') {
+      talent = talent.filter((item) => item.availability === availability)
     }
 
-    // Get user IDs
-    const userIds = profiles.map((p: any) => p.user_id).filter(Boolean)
-
-    if (userIds.length === 0) {
-      return NextResponse.json({ talent: [], total: 0, page: 1, limit: 100 })
+    if (skillFilters.length > 0) {
+      const lowered = skillFilters.map((skill) => skill.toLowerCase())
+      talent = talent.filter((item) =>
+        item.skills.some((skill: string) => lowered.includes(skill.toLowerCase()))
+      )
     }
-
-    // Fetch users
-    const userUrl = new URL(`${baseUrl}/rest/v1/users`)
-    userUrl.searchParams.set('select', 'id,full_name,email')
-    userUrl.searchParams.set('id', `in.(${userIds.join(',')})`)
-
-    const userResponse = await fetch(userUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      cache: 'no-store',
-    })
-
-    let users: any[] = []
-    if (userResponse.ok) {
-      users = await userResponse.json()
-    }
-
-    const userMap = new Map(Array.isArray(users) ? users.map((u: any) => [u.id, u]) : [])
-
-    // Transform to talent objects
-    const avatarColors = [
-      { bg: '#EDE9FE', text: '#5B21B6' },
-      { bg: '#DBEAFE', text: '#1E40AF' },
-      { bg: '#D1FAE5', text: '#065F46' },
-      { bg: '#FEF3C7', text: '#92400E' },
-      { bg: '#FCE7F3', text: '#9D174D' },
-      { bg: '#ECFDF5', text: '#064E3B' },
-      { bg: '#FFF7ED', text: '#92400E' },
-    ]
-
-    const talent = profiles.map((profile: any) => {
-      const user = userMap.get(profile.user_id)
-      const fullName = user?.full_name || 'Unknown'
-      const initials = fullName
-        .split(' ')
-        .map((n: string) => n[0])
-        .join('')
-        .toUpperCase()
-        .substring(0, 2)
-
-      const colorIndex = (profile.user_id?.charCodeAt(0) || 0) % avatarColors.length
-      const colors = avatarColors[colorIndex]
-
-      return {
-        id: profile.user_id,
-        full_name: fullName,
-        email: user?.email || '',
-        initials: initials || '?',
-        avatarBg: colors.bg,
-        avatarTc: colors.text,
-        headline: profile.headline || 'PHP Developer',
-        location_city: profile.location_city || 'Remote',
-        location_country: profile.location_country || '',
-        hourly_rate_usd: profile.hourly_rate_usd || 0,
-        php_years: profile.php_years || 0,
-        avg_rating: profile.avg_rating || 0,
-        total_reviews: profile.total_reviews || 0,
-        total_jobs: profile.total_jobs || 0,
-        availability: profile.availability || 'available',
-        hire_types: profile.hire_types || ['freelance'],
-        is_verified: profile.is_verified || false,
-        is_featured: profile.is_featured || false,
-        languages: Array.isArray(profile.languages) ? profile.languages : ['English'],
-        skills: Array.isArray(profile.skills) ? profile.skills : [],
-        php_versions: Array.isArray(profile.php_versions) ? profile.php_versions : ['PHP 8.3'],
-        type: profile.type || 'individual',
-        monthly_rate: profile.monthly_rate || 0,
-      }
-    })
 
     return NextResponse.json({
       talent,
       total: talent.length,
       page: 1,
-      limit: 100,
+      limit,
     })
-  } catch (error: any) {
-    console.error('GET /api/talent error:', error?.message)
-    // Return empty array on error instead of 500
-    return NextResponse.json({ talent: [], total: 0, page: 1, limit: 100 })
+  } catch (error) {
+    console.error('GET /api/talent unexpected error:', error)
+    return NextResponse.json({ error: 'Failed to fetch talent' }, { status: 500 })
   }
 }
 
 export async function POST(req: NextRequest) {
   try {
-    const userId = req.headers.get('x-user-id')
+    const sessionUser = getSessionUser(req)
 
-    if (!userId) {
-      return NextResponse.json({ error: 'User ID required' }, { status: 400 })
-    }
-
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const apiKey = process.env.SUPABASE_SERVICE_KEY
-
-    if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: 'Missing config' }, { status: 500 })
+    if (!sessionUser || sessionUser.user_type !== 'talent') {
+      return NextResponse.json({ error: 'Only developer accounts can update talent profiles' }, { status: 403 })
     }
 
     const body = await req.json()
+    const supabase = getSupabaseAdmin()
 
-    // Check if exists
-    const checkUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-    checkUrl.searchParams.set('user_id', `eq.${userId}`)
-    checkUrl.searchParams.set('select', 'id')
-
-    const checkResponse = await fetch(checkUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      cache: 'no-store',
-    })
-
-    const existing = await checkResponse.json()
-    const exists = Array.isArray(existing) && existing.length > 0
-
-    let result: any
-
-    if (exists) {
-      // Update
-      const updateUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-      updateUrl.searchParams.set('user_id', `eq.${userId}`)
-
-      const updateResponse = await fetch(updateUrl.toString(), {
-        method: 'PATCH',
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify({
-          ...body,
-          updated_at: new Date().toISOString(),
-        }),
-        cache: 'no-store',
-      })
-
-      if (updateResponse.ok) {
-        const updated = await updateResponse.json()
-        result = Array.isArray(updated) ? updated[0] : null
-      }
-    } else {
-      // Create
-      const createUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-
-      const createResponse = await fetch(createUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify({
-          user_id: userId,
-          ...body,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }),
-        cache: 'no-store',
-      })
-
-      if (createResponse.ok) {
-        const created = await createResponse.json()
-        result = Array.isArray(created) ? created[0] : null
-      }
+    const payload = {
+      headline: body.headline || null,
+      bio: body.bio || null,
+      location_city: body.location_city || null,
+      location_country: body.location_country || null,
+      timezone: body.timezone || null,
+      hourly_rate_usd: body.hourly_rate_usd || null,
+      php_years: body.php_years || null,
+      php_versions: Array.isArray(body.php_versions) ? body.php_versions : [],
+      availability: body.availability || 'available',
+      hire_types: Array.isArray(body.hire_types) ? body.hire_types : ['freelance'],
+      remote_ok: body.remote_ok !== false,
+      portfolio_url: body.portfolio_url || null,
+      github_url: body.github_url || null,
+      linkedin_url: body.linkedin_url || null,
+      skills: Array.isArray(body.skills) ? body.skills : [],
+      languages: Array.isArray(body.languages) ? body.languages : ['English'],
+      is_active: true,
+      updated_at: new Date().toISOString(),
     }
 
-    return NextResponse.json(result, { status: 201 })
-  } catch (error: any) {
-    console.error('POST /api/talent error:', error?.message)
-    return NextResponse.json({ error: 'Server error' }, { status: 500 })
+    const { data: existingProfile } = await supabase
+      .from('talent_profiles')
+      .select('id')
+      .eq('user_id', sessionUser.userId)
+      .single()
+
+    const query = existingProfile
+      ? supabase
+          .from('talent_profiles')
+          .update(payload)
+          .eq('user_id', sessionUser.userId)
+      : supabase
+          .from('talent_profiles')
+          .insert({
+            user_id: sessionUser.userId,
+            avg_rating: 0,
+            total_reviews: 0,
+            total_jobs: 0,
+            profile_views: 0,
+            is_verified: false,
+            is_featured: false,
+            created_at: new Date().toISOString(),
+            ...payload,
+          })
+
+    const { data, error } = await query.select('*').single()
+
+    if (error) {
+      console.error('POST /api/talent save error:', error)
+      return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
+    }
+
+    return NextResponse.json({ profile: data }, { status: existingProfile ? 200 : 201 })
+  } catch (error) {
+    console.error('POST /api/talent unexpected error:', error)
+    return NextResponse.json({ error: 'Failed to save profile' }, { status: 500 })
   }
 }

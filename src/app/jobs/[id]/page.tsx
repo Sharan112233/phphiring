@@ -1,15 +1,16 @@
 'use client'
-import { useParams } from 'next/navigation'
-import { useState, useEffect } from 'react'
+import { useParams, useRouter } from 'next/navigation'
+import { useEffect, useState } from 'react'
 import Link from 'next/link'
-import { useRouter } from 'next/navigation'
-import Navbar from '../../../components/layout/Navbar'
-import Footer from '../../../components/layout/Footer'
+import Navbar from '@/components/layout/Navbar'
+import Footer from '@/components/layout/Footer'
+import PageLoader from '@/components/ui/PageLoader'
 
 export default function JobDetailPage() {
   const { id } = useParams()
   const router = useRouter()
   const [job, setJob] = useState<any>(null)
+  const [viewer, setViewer] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [applying, setApplying] = useState(false)
@@ -18,21 +19,33 @@ export default function JobDetailPage() {
 
   useEffect(() => {
     if (!id) return
+
+    const fetchJob = async () => {
+      try {
+        const [jobRes, meRes] = await Promise.all([
+          fetch(`/api/jobs/${id}`),
+          fetch('/api/auth/me'),
+        ])
+
+        const jobData = await jobRes.json()
+        if (!jobRes.ok) throw new Error(jobData.error || 'Job not found')
+        setJob(jobData)
+
+        if (meRes.ok) {
+          const meData = await meRes.json()
+          setViewer(meData.user || null)
+        } else {
+          setViewer(null)
+        }
+      } catch (err: any) {
+        setError(err.message)
+      } finally {
+        setLoading(false)
+      }
+    }
+
     fetchJob()
   }, [id])
-
-  const fetchJob = async () => {
-    try {
-      const res = await fetch(`/api/jobs/${id}`)
-      if (!res.ok) throw new Error('Job not found')
-      const data = await res.json()
-      setJob(data)
-    } catch (err: any) {
-      setError(err.message)
-    } finally {
-      setLoading(false)
-    }
-  }
 
   const handleApply = async (e: React.FormEvent) => {
     e.preventDefault()
@@ -46,313 +59,216 @@ export default function JobDetailPage() {
         return
       }
 
-      const userData = JSON.parse(userStr)
+      const user = JSON.parse(userStr)
+      if (user.user_type !== 'talent') {
+        setApplyMessage('Only developer accounts can apply to jobs.')
+        setApplying(false)
+        return
+      }
 
-      const res = await fetch(`/api/jobs/${id}/apply`, {
+      const res = await fetch('/api/jobs/apply', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          user_id: userData.id,
-          cover_note: coverNote,
-          job_id: id,
-        }),
+        body: JSON.stringify({ job_id: id, cover_note: coverNote }),
       })
 
-      if (!res.ok) throw new Error('Failed to apply')
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.error || 'Failed to apply')
 
-      setApplyMessage('✓ Application submitted successfully!')
+      setApplyMessage('Application submitted successfully.')
       setCoverNote('')
-      setTimeout(() => router.push('/dashboard/applications'), 2000)
+      setTimeout(() => router.push('/dashboard/applications'), 1200)
     } catch (err: any) {
-      setApplyMessage('✗ Error: ' + err.message)
+      setApplyMessage(err.message || 'Failed to apply')
     } finally {
       setApplying(false)
     }
   }
 
-  const daysUntilDeadline = (deadline: string) => {
-    const today = new Date()
-    const deadlineDate = new Date(deadline)
-    const diffTime = deadlineDate.getTime() - today.getTime()
-    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24))
-    
-    if (diffDays < 0) return { text: 'Closed', color: '#DC2626' }
-    if (diffDays === 0) return { text: 'Closes today', color: '#DC2626' }
-    if (diffDays === 1) return { text: 'Closes tomorrow', color: '#D97706' }
-    return { text: `${diffDays} days left`, color: '#059669' }
+  const formatBudget = () => {
+    if (!job) return ''
+    if (job.budget_min && job.budget_max) {
+      return `${job.budget_min} - ${job.budget_max} ${job.budget_type === 'hourly' ? 'per hour' : job.budget_type === 'monthly' ? 'per month' : 'total'}`
+    }
+    return 'Budget on discussion'
   }
 
-  const timeAgo = (date: string) => {
-    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-    if (diff < 60) return 'just now'
-    if (diff < 3600) return `${Math.floor(diff / 60)}m ago`
-    if (diff < 86400) return `${Math.floor(diff / 3600)}h ago`
-    if (diff < 604800) return `${Math.floor(diff / 86400)}d ago`
-    return `${Math.floor(diff / 604800)}w ago`
+  const formatMetaValue = (value: unknown, fallback = 'Not provided') => {
+    if (value === null || value === undefined || value === '') return fallback
+    if (typeof value === 'boolean') return value ? 'Yes' : 'No'
+    return String(value)
   }
 
   if (loading) {
     return (
       <>
         <Navbar />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh' }}>
-          <div style={{
-            width: 40,
-            height: 40,
-            border: '3px solid #E8E4F0',
-            borderTopColor: '#7C3AED',
-            borderRadius: '50%',
-            animation: 'spin 0.7s linear infinite',
-          }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-        </div>
+        <PageLoader label="Loading job..." minHeight="70vh" />
         <Footer />
       </>
     )
   }
 
-  if (error || !job) {
+  if (!job || error) {
     return (
       <>
         <Navbar />
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', minHeight: '80vh', flexDirection: 'column' }}>
-          <p style={{ color: '#DC2626', fontSize: 18, marginBottom: 16 }}>Error: {error || 'Job not found'}</p>
-          <Link href="/jobs" style={{
-            padding: '10px 20px',
-            background: '#7C3AED',
-            color: '#fff',
-            borderRadius: 6,
-            textDecoration: 'none',
-            fontWeight: 600,
-          }}>
-            Back to Jobs
-          </Link>
+        <div style={{ minHeight: '70vh', display: 'flex', alignItems: 'center', justifyContent: 'center', flexDirection: 'column', gap: 12 }}>
+          <p style={{ color: '#DC2626' }}>{error || 'Job not found'}</p>
+          <Link href="/jobs" style={{ color: '#7C3AED', fontWeight: 600, textDecoration: 'none' }}>Back to Jobs</Link>
         </div>
         <Footer />
       </>
     )
   }
 
-  const deadline = daysUntilDeadline(job.deadline_date)
+  const expired = new Date(job.expires_at) < new Date()
+  const isRecruiter = viewer?.user_type === 'recruiter'
+  const isTalent = viewer?.user_type === 'talent'
+  const isOwnerRecruiter = Boolean(isRecruiter && (viewer?.id === job.poster_id || viewer?.id === job.poster?.id))
+  const canApply = !isRecruiter && (!viewer || isTalent)
+  const blockedRecruiter = Boolean(isRecruiter && !isOwnerRecruiter)
+
+  if (blockedRecruiter) {
+    return (
+      <>
+        <Navbar />
+        <main style={{ background: '#FAFAF9', minHeight: '100vh', paddingTop: 40, paddingBottom: 60 }}>
+          <div style={{ maxWidth: 760, margin: '0 auto', padding: '0 24px' }}>
+            <div style={{ background: '#fff', border: '1px solid #E8E4F0', borderRadius: 16, padding: 32, textAlign: 'center' }}>
+              <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 10px 0', color: '#0F0A1E' }}>This job is not in your recruiter account</h1>
+              <p style={{ fontSize: 14, color: '#666', margin: '0 0 20px 0', lineHeight: 1.7 }}>
+                Recruiter job review pages only show jobs posted by your own account. You can manage your own postings from the dashboard.
+              </p>
+              <Link href="/dashboard/applications" style={{ display: 'inline-block', padding: '12px 18px', borderRadius: 10, background: '#7C3AED', color: '#fff', textDecoration: 'none', fontWeight: 700 }}>
+                Back to My Posted Jobs
+              </Link>
+            </div>
+          </div>
+        </main>
+        <Footer />
+      </>
+    )
+  }
 
   return (
     <>
       <Navbar />
       <main style={{ background: '#FAFAF9', minHeight: '100vh', paddingTop: 40, paddingBottom: 60 }}>
         <div style={{ maxWidth: 900, margin: '0 auto', padding: '0 24px' }}>
-          {/* Back Button */}
           <Link
-            href="/jobs"
-            style={{
-              display: 'inline-block',
-              marginBottom: 24,
-              color: '#7C3AED',
-              textDecoration: 'none',
-              fontWeight: 600,
-              fontSize: 14,
-            }}
+            href={isOwnerRecruiter ? '/dashboard/applications' : '/jobs'}
+            style={{ display: 'inline-block', marginBottom: 24, color: '#7C3AED', textDecoration: 'none', fontWeight: 600, fontSize: 14 }}
           >
-            ← Back to Jobs
+            {isOwnerRecruiter ? 'Back to My Posted Jobs' : 'Back to Jobs'}
           </Link>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 350px', gap: 24, alignItems: 'flex-start' }}>
-            {/* Main Content */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 340px', gap: 24, alignItems: 'flex-start' }}>
             <div>
-              {/* Header */}
-              <div style={{
-                background: '#fff',
-                padding: 24,
-                borderRadius: 12,
-                border: '1px solid #E8E4F0',
-                marginBottom: 24,
-              }}>
-                <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 8px 0', color: '#0F0A1E' }}>
-                  {job.title}
-                </h1>
+              <div style={{ background: '#fff', padding: 24, borderRadius: 12, border: '1px solid #E8E4F0', marginBottom: 24 }}>
+                <h1 style={{ fontSize: 28, fontWeight: 800, margin: '0 0 8px 0', color: '#0F0A1E' }}>{job.title}</h1>
                 <p style={{ fontSize: 14, color: '#666', margin: '0 0 16px 0' }}>
-                  {job.company_name} · {job.hire_type}
+                  {job.company_name || 'Hiring company'} · {job.hire_type?.replace('_', ' ')} · {job.preferred_location || 'Remote'}
                 </p>
 
-                {/* Dates Info */}
-                <div style={{
-                  background: '#F8F7FF',
-                  padding: 12,
-                  borderRadius: 8,
-                  marginBottom: 16,
-                  fontSize: 13,
-                }}>
-                  <div style={{ marginBottom: 8, display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: '#666' }}>📅 Posted: {timeAgo(job.created_at)}</span>
-                    <span style={{ color: '#999', fontSize: 12 }}>
-                      {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <span style={{ color: '#666' }}>⏰ Deadline: {deadline.text}</span>
-                    <span style={{
-                      color: deadline.color,
-                      fontWeight: 600,
-                      fontSize: 12,
-                    }}>
-                      {new Date(job.deadline_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Budget */}
-                <div style={{
-                  display: 'flex',
-                  gap: 20,
-                  paddingTop: 16,
-                  borderTop: '1px solid #E8E4F0',
-                }}>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16 }}>
                   <div>
-                    <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 6px 0' }}>
-                      Budget
+                    <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 6px 0' }}>Budget</p>
+                    <p style={{ fontSize: 16, fontWeight: 700, color: '#7C3AED', margin: 0 }}>{formatBudget()}</p>
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 6px 0' }}>Posted</p>
+                    <p style={{ fontSize: 16, fontWeight: 700, margin: 0 }}>
+                      {new Date(job.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
-                    <p style={{ fontSize: 18, fontWeight: 700, color: '#7C3AED', margin: 0 }}>
-                      ${job.budget_min}-${job.budget_max}
-                    </p>
-                    <p style={{ fontSize: 11, color: '#999', margin: '4px 0 0 0' }}>
-                      {job.budget_type === 'hourly' ? 'per hour' : 'total'}
+                  </div>
+                  <div>
+                    <p style={{ fontSize: 11, color: '#999', textTransform: 'uppercase', fontWeight: 600, margin: '0 0 6px 0' }}>Deadline</p>
+                    <p style={{ fontSize: 16, fontWeight: 700, margin: 0, color: expired ? '#DC2626' : '#059669' }}>
+                      {new Date(job.expires_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                     </p>
                   </div>
                 </div>
               </div>
 
-              {/* Description */}
-              <div style={{
-                background: '#fff',
-                padding: 24,
-                borderRadius: 12,
-                border: '1px solid #E8E4F0',
-                marginBottom: 24,
-              }}>
-                <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#0F0A1E' }}>
-                  Description
-                </h2>
-                <p style={{
-                  fontSize: 14,
-                  lineHeight: 1.8,
-                  color: '#3D3558',
-                  whiteSpace: 'pre-wrap',
-                }}>
-                  {job.description}
-                </p>
+              <div style={{ background: '#fff', padding: 24, borderRadius: 12, border: '1px solid #E8E4F0', marginBottom: 24 }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#0F0A1E' }}>Description</h2>
+                <p style={{ fontSize: 14, lineHeight: 1.8, color: '#3D3558', whiteSpace: 'pre-wrap' }}>{job.description}</p>
               </div>
 
-              {/* Skills */}
-              {job.required_skills && job.required_skills.length > 0 && (
-                <div style={{
-                  background: '#fff',
-                  padding: 24,
-                  borderRadius: 12,
-                  border: '1px solid #E8E4F0',
-                }}>
-                  <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#0F0A1E' }}>
-                    Required Skills
-                  </h2>
-                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-                    {job.required_skills.map((skill: string) => (
-                      <span
-                        key={skill}
-                        style={{
-                          padding: '6px 14px',
-                          background: '#EDE9FE',
-                          color: '#5B21B6',
-                          borderRadius: 20,
-                          fontSize: 13,
-                          fontWeight: 500,
-                          border: '1px solid #C4B5FD',
-                        }}
-                      >
-                        {skill}
-                      </span>
-                    ))}
-                  </div>
+              <div style={{ background: '#fff', padding: 24, borderRadius: 12, border: '1px solid #E8E4F0' }}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 12, color: '#0F0A1E' }}>Required Skills</h2>
+                <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                  {(job.required_skills || []).map((skill: string) => (
+                    <span key={skill} style={{ padding: '6px 14px', background: '#EDE9FE', color: '#5B21B6', borderRadius: 20, fontSize: 13, fontWeight: 500, border: '1px solid #C4B5FD' }}>
+                      {skill}
+                    </span>
+                  ))}
                 </div>
-              )}
+              </div>
             </div>
 
-            {/* Sidebar - Apply Form */}
-            <div style={{
-              background: '#fff',
-              padding: 24,
-              borderRadius: 12,
-              border: '1px solid #E8E4F0',
-              height: 'fit-content',
-              position: 'sticky',
-              top: 100,
-            }}>
-              <form onSubmit={handleApply}>
-                {applyMessage && (
-                  <div style={{
-                    padding: 10,
-                    marginBottom: 12,
-                    borderRadius: 6,
-                    background: applyMessage.includes('✓') ? '#D1FAE5' : '#FEE2E2',
-                    color: applyMessage.includes('✓') ? '#059669' : '#DC2626',
-                    fontSize: 12,
-                    fontWeight: 500,
-                  }}>
-                    {applyMessage}
+            <div style={{ background: '#fff', padding: 24, borderRadius: 12, border: '1px solid #E8E4F0', position: 'sticky', top: 96 }}>
+              {isOwnerRecruiter ? (
+                <>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 16px 0', color: '#0F0A1E' }}>Your Posted Job Details</h3>
+                  <div style={{ display: 'grid', gap: 12 }}>
+                    {[
+                      ['Company', job.company_name],
+                      ['Contact Name', job.contact_name],
+                      ['Contact Email', job.contact_email],
+                      ['Job Type', job.hire_type?.replace('_', ' ')],
+                      ['Duration', job.duration],
+                      ['Preferred Location', job.preferred_location],
+                      ['Remote OK', job.remote_ok],
+                      ['Language', job.required_language],
+                      ['Applications', job.applications_count],
+                      ['Status', job.status],
+                    ].map(([label, value]) => (
+                      <div key={label} style={{ background: '#FAFAF9', border: '1px solid #F1EDF7', borderRadius: 10, padding: 12 }}>
+                        <div style={{ fontSize: 11, color: '#7B7494', textTransform: 'uppercase', fontWeight: 700, marginBottom: 4 }}>{label}</div>
+                        <div style={{ fontSize: 14, color: '#0F0A1E', fontWeight: 600 }}>{formatMetaValue(value)}</div>
+                      </div>
+                    ))}
                   </div>
-                )}
+                </>
+              ) : canApply ? (
+                <form onSubmit={handleApply}>
+                  {applyMessage && (
+                    <div style={{ padding: 10, marginBottom: 12, borderRadius: 6, background: applyMessage.includes('successfully') ? '#D1FAE5' : '#FEE2E2', color: applyMessage.includes('successfully') ? '#059669' : '#DC2626', fontSize: 12, fontWeight: 500 }}>
+                      {applyMessage}
+                    </div>
+                  )}
 
-                <div style={{ marginBottom: 16 }}>
-                  <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, fontSize: 13 }}>
-                    Cover Note
-                  </label>
-                  <textarea
-                    value={coverNote}
-                    onChange={(e) => setCoverNote(e.target.value)}
-                    placeholder="Tell the recruiter why you're a great fit..."
-                    style={{
-                      width: '100%',
-                      padding: '10px',
-                      border: '1px solid #E8E4F0',
-                      borderRadius: 6,
-                      fontSize: 12,
-                      fontFamily: 'inherit',
-                      minHeight: 100,
-                      boxSizing: 'border-box',
-                    }}
-                  />
+                  <div style={{ marginBottom: 16 }}>
+                    <label style={{ display: 'block', fontWeight: 600, marginBottom: 8, fontSize: 13 }}>Cover Note</label>
+                    <textarea
+                      value={coverNote}
+                      onChange={(e) => setCoverNote(e.target.value)}
+                      placeholder="Summarize your PHP experience, similar projects, and availability."
+                      style={{ width: '100%', padding: 10, border: '1px solid #E8E4F0', borderRadius: 6, fontSize: 12, fontFamily: 'inherit', minHeight: 120, boxSizing: 'border-box' }}
+                    />
+                  </div>
+
+                  <button
+                    type="submit"
+                    disabled={applying || expired}
+                    style={{ width: '100%', padding: 12, background: expired ? '#CBD5E1' : '#7C3AED', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: expired ? 'not-allowed' : 'pointer', opacity: applying ? 0.7 : 1, marginBottom: 12 }}
+                  >
+                    {applying ? 'Applying...' : expired ? 'Applications Closed' : 'Apply Now'}
+                  </button>
+                </form>
+              ) : (
+                <div>
+                  <h3 style={{ fontSize: 18, fontWeight: 800, margin: '0 0 12px 0', color: '#0F0A1E' }}>Sign in as a developer to apply</h3>
+                  <p style={{ fontSize: 13, color: '#666', lineHeight: 1.7, margin: '0 0 16px 0' }}>
+                    Candidate applications are available only for developer accounts. Recruiters can manage their own jobs from the dashboard.
+                  </p>
+                  <Link href="/auth/login" style={{ display: 'inline-block', padding: '12px 16px', borderRadius: 10, background: '#7C3AED', color: '#fff', textDecoration: 'none', fontWeight: 700 }}>
+                    Sign In
+                  </Link>
                 </div>
-
-                <button
-                  type="submit"
-                  disabled={applying}
-                  style={{
-                    width: '100%',
-                    padding: 12,
-                    background: '#7C3AED',
-                    color: '#fff',
-                    border: 'none',
-                    borderRadius: 8,
-                    fontWeight: 600,
-                    cursor: applying ? 'not-allowed' : 'pointer',
-                    opacity: applying ? 0.7 : 1,
-                    marginBottom: 12,
-                  }}
-                >
-                  {applying ? 'Applying...' : 'Apply Now'}
-                </button>
-
-                {new Date(job.deadline_date) < new Date() && (
-                  <div style={{
-                    padding: 10,
-                    background: '#FEE2E2',
-                    color: '#DC2626',
-                    borderRadius: 6,
-                    fontSize: 12,
-                    textAlign: 'center',
-                    fontWeight: 600,
-                  }}>
-                    This job has closed
-                  </div>
-                )}
-              </form>
+              )}
             </div>
           </div>
         </div>

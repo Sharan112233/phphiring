@@ -1,4 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { getSupabaseAdmin } from '@/lib/supabase'
+
+function cleanUndefined<T extends Record<string, unknown>>(obj: T) {
+  return Object.fromEntries(
+    Object.entries(obj).filter(([, value]) => value !== undefined)
+  )
+}
 
 export async function GET(
   req: NextRequest,
@@ -11,79 +18,38 @@ export async function GET(
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const apiKey = process.env.SUPABASE_SERVICE_KEY
+    const supabase = getSupabaseAdmin()
 
-    if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: 'Missing config' }, { status: 500 })
-    }
+    const { data: user, error: userError } = await supabase
+      .from('users')
+      .select('id, email, full_name, user_type, plan')
+      .eq('id', userId)
+      .single()
 
-    // Fetch user
-    const userUrl = new URL(`${baseUrl}/rest/v1/users`)
-    userUrl.searchParams.set('id', `eq.${userId}`)
-    userUrl.searchParams.set('select', '*')
-
-    const userResponse = await fetch(userUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      cache: 'no-store',
-    })
-
-    if (!userResponse.ok) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const users = await userResponse.json()
-    if (!Array.isArray(users) || users.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    const user = users[0]
-
-    // Fetch profile
-    const profileUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-    profileUrl.searchParams.set('user_id', `eq.${userId}`)
-    profileUrl.searchParams.set('select', '*')
-
-    let profile = null
-    try {
-      const profileResponse = await fetch(profileUrl.toString(), {
-        method: 'GET',
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        cache: 'no-store',
-      })
-
-      if (profileResponse.ok) {
-        const profiles = await profileResponse.json()
-        if (Array.isArray(profiles) && profiles.length > 0) {
-          profile = profiles[0]
-        }
+    if (userError || !user) {
+      if (userError) {
+        console.error('GET /api/users user fetch error:', userError)
       }
-    } catch (e) {
-      console.log('Profile fetch error (non-critical):', e)
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+
+    const { data: profiles, error: profileError } = await supabase
+      .from('talent_profiles')
+      .select('*')
+      .eq('user_id', userId)
+      .limit(1)
+
+    if (profileError) {
+      console.error('GET /api/users profile fetch error:', profileError)
     }
 
     return NextResponse.json({
       success: true,
-      user: {
-        id: user.id,
-        email: user.email,
-        full_name: user.full_name,
-        user_type: user.user_type,
-        plan: user.plan,
-      },
-      profile: profile,
+      user,
+      profile: Array.isArray(profiles) && profiles.length > 0 ? profiles[0] : null,
     })
-  } catch (error: any) {
-    console.error('GET /api/users error:', error?.message)
+  } catch (error) {
+    console.error('GET /api/users error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -99,143 +65,131 @@ export async function PUT(
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const apiKey = process.env.SUPABASE_SERVICE_KEY
-
-    if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: 'Missing config' }, { status: 500 })
-    }
-
     const body = await req.json()
+    const supabase = getSupabaseAdmin()
 
-    // Check user exists
-    const checkUrl = new URL(`${baseUrl}/rest/v1/users`)
-    checkUrl.searchParams.set('id', `eq.${userId}`)
-    checkUrl.searchParams.set('select', 'id')
+    const { data: existingUser, error: userCheckError } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', userId)
+      .single()
 
-    const checkResponse = await fetch(checkUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      cache: 'no-store',
-    })
-
-    const users = await checkResponse.json()
-    if (!Array.isArray(users) || users.length === 0) {
+    if (userCheckError || !existingUser) {
+      if (userCheckError) {
+        console.error('PUT /api/users user check error:', userCheckError)
+      }
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Update talent_profiles
-    const profileData = {
-      headline: body.headline || null,
-      bio: body.bio || null,
-      skills: body.skills || null,
-      languages: body.languages || null,
-      certifications: body.certifications || null,
-      hourly_rate_usd: body.hourly_rate_usd || null,
-      availability: body.availability || null,
-      portfolio_url: body.portfolio_url || null,
-      github_url: body.github_url || null,
-      linkedin_url: body.linkedin_url || null,
-      location_city: body.location_city || null,
-      location_country: body.location_country || null,
+    const userFields = cleanUndefined({
+      full_name: body.full_name,
+      email: typeof body.email === 'string' ? body.email.toLowerCase().trim() : body.email,
+      plan: body.plan,
       updated_at: new Date().toISOString(),
-    }
-
-    // Check if profile exists
-    const profileCheckUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-    profileCheckUrl.searchParams.set('user_id', `eq.${userId}`)
-    profileCheckUrl.searchParams.set('select', 'id')
-
-    const profileCheckResponse = await fetch(profileCheckUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      cache: 'no-store',
     })
 
-    const existingProfiles = await profileCheckResponse.json()
+    const profileFields = cleanUndefined({
+      headline: body.headline ?? null,
+      bio: body.bio ?? null,
+      skills: Array.isArray(body.skills) ? body.skills : body.skills ?? null,
+      languages: Array.isArray(body.languages) ? body.languages : body.languages ?? null,
+      certifications: Array.isArray(body.certifications) ? body.certifications : body.certifications ?? null,
+      hourly_rate_usd: body.hourly_rate_usd ?? null,
+      php_years: body.php_years ?? null,
+      total_jobs: body.total_jobs ?? null,
+      availability: body.availability ?? null,
+      portfolio_url: body.portfolio_url ?? null,
+      github_url: body.github_url ?? null,
+      linkedin_url: body.linkedin_url ?? null,
+      location_city: body.location_city ?? null,
+      location_country: body.location_country ?? null,
+      updated_at: new Date().toISOString(),
+    })
+
+    if (Object.keys(userFields).length > 1) {
+      const { error: updateUserError } = await supabase
+        .from('users')
+        .update(userFields)
+        .eq('id', userId)
+
+      if (updateUserError) {
+        console.error('PUT /api/users user update error:', updateUserError)
+        return NextResponse.json(
+          { error: updateUserError.message || 'Failed to update user' },
+          { status: 500 }
+        )
+      }
+    }
+
+    const { data: existingProfiles, error: profileCheckError } = await supabase
+      .from('talent_profiles')
+      .select('id')
+      .eq('user_id', userId)
+      .limit(1)
+
+    if (profileCheckError) {
+      console.error('PUT /api/users profile check error:', profileCheckError)
+      return NextResponse.json(
+        { error: profileCheckError.message || 'Failed to check profile' },
+        { status: 500 }
+      )
+    }
 
     let profile = null
 
     if (Array.isArray(existingProfiles) && existingProfiles.length > 0) {
-      // Update existing
-      const updateUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-      updateUrl.searchParams.set('user_id', `eq.${userId}`)
+      const { data: updatedProfiles, error: updateProfileError } = await supabase
+        .from('talent_profiles')
+        .update(profileFields)
+        .eq('user_id', userId)
+        .select('*')
 
-      const updateResponse = await fetch(updateUrl.toString(), {
-        method: 'PATCH',
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify(profileData),
-        cache: 'no-store',
-      })
-
-      if (updateResponse.ok) {
-        const profiles = await updateResponse.json()
-        if (Array.isArray(profiles) && profiles.length > 0) {
-          profile = profiles[0]
-        }
+      if (updateProfileError) {
+        console.error('PUT /api/users profile update error:', updateProfileError)
+        return NextResponse.json(
+          { error: updateProfileError.message || 'Failed to update profile' },
+          { status: 500 }
+        )
       }
+
+      profile = Array.isArray(updatedProfiles) ? updatedProfiles[0] : null
     } else {
-      // Create new
-      const createUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-
-      const createResponse = await fetch(createUrl.toString(), {
-        method: 'POST',
-        headers: {
-          'apikey': apiKey,
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: JSON.stringify({
+      const { data: createdProfiles, error: createProfileError } = await supabase
+        .from('talent_profiles')
+        .insert({
           user_id: userId,
-          ...profileData,
-        }),
-        cache: 'no-store',
-      })
+          ...profileFields,
+        })
+        .select('*')
 
-      if (createResponse.ok) {
-        const profiles = await createResponse.json()
-        if (Array.isArray(profiles) && profiles.length > 0) {
-          profile = profiles[0]
-        }
+      if (createProfileError) {
+        console.error('PUT /api/users profile create error:', createProfileError)
+        return NextResponse.json(
+          { error: createProfileError.message || 'Failed to create profile' },
+          { status: 500 }
+        )
       }
+
+      profile = Array.isArray(createdProfiles) ? createdProfiles[0] : null
     }
 
-    // Get updated user
-    const finalUserUrl = new URL(`${baseUrl}/rest/v1/users`)
-    finalUserUrl.searchParams.set('id', `eq.${userId}`)
-    finalUserUrl.searchParams.set('select', '*')
+    const { data: finalUser, error: finalUserError } = await supabase
+      .from('users')
+      .select('*')
+      .eq('id', userId)
+      .single()
 
-    const finalUserResponse = await fetch(finalUserUrl.toString(), {
-      method: 'GET',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-      },
-      cache: 'no-store',
-    })
-
-    const finalUsers = await finalUserResponse.json()
-    const finalUser = Array.isArray(finalUsers) ? finalUsers[0] : null
+    if (finalUserError) {
+      console.error('PUT /api/users final user fetch error:', finalUserError)
+    }
 
     return NextResponse.json({
       success: true,
-      user: finalUser,
-      profile: profile,
+      user: finalUser || null,
+      profile,
     })
-  } catch (error: any) {
-    console.error('PUT /api/users error:', error?.message)
+  } catch (error) {
+    console.error('PUT /api/users error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
@@ -251,44 +205,32 @@ export async function PATCH(
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    const baseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL
-    const apiKey = process.env.SUPABASE_SERVICE_KEY
-
-    if (!baseUrl || !apiKey) {
-      return NextResponse.json({ error: 'Missing config' }, { status: 500 })
-    }
-
     const body = await req.json()
+    const supabase = getSupabaseAdmin()
 
-    const updateUrl = new URL(`${baseUrl}/rest/v1/talent_profiles`)
-    updateUrl.searchParams.set('user_id', `eq.${userId}`)
-
-    const updateResponse = await fetch(updateUrl.toString(), {
-      method: 'PATCH',
-      headers: {
-        'apikey': apiKey,
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-      },
-      body: JSON.stringify({
+    const { data: profiles, error } = await supabase
+      .from('talent_profiles')
+      .update({
         ...body,
         updated_at: new Date().toISOString(),
-      }),
-      cache: 'no-store',
-    })
-
-    if (updateResponse.ok) {
-      const profiles = await updateResponse.json()
-      return NextResponse.json({
-        success: true,
-        profile: Array.isArray(profiles) ? profiles[0] : null,
       })
+      .eq('user_id', userId)
+      .select('*')
+
+    if (error) {
+      console.error('PATCH /api/users profile update error:', error)
+      return NextResponse.json(
+        { error: error.message || 'Update failed' },
+        { status: 500 }
+      )
     }
 
-    return NextResponse.json({ error: 'Update failed' }, { status: 500 })
-  } catch (error: any) {
-    console.error('PATCH /api/users error:', error?.message)
+    return NextResponse.json({
+      success: true,
+      profile: Array.isArray(profiles) ? profiles[0] : null,
+    })
+  } catch (error) {
+    console.error('PATCH /api/users error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }

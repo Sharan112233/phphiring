@@ -48,23 +48,25 @@ export async function POST(req: NextRequest) {
       )
     }
 
-   const token = signToken({
-  userId: user.id,
-  email: user.email,
-  user_type: user.user_type,
-})
+    const token = signToken({
+      userId: user.id,
+      email: user.email,
+      user_type: user.user_type,
+    })
 
-const publicUser = {
-  id: user.id,
-  full_name: user.full_name,
-  email: user.email,
-  user_type: user.user_type,
-  plan: user.plan,
-  jobs_applied_count: user.jobs_applied_count,
-  jobs_posted_count: user.jobs_posted_count,
-}
+    await setSessionCookie(token)
 
-return NextResponse.json({ user: publicUser })
+    const publicUser = {
+      id: user.id,
+      full_name: user.full_name,
+      email: user.email,
+      user_type: user.user_type,
+      plan: user.plan,
+      jobs_applied_count: user.jobs_applied_count,
+      jobs_posted_count: user.jobs_posted_count,
+    }
+
+    return NextResponse.json({ user: publicUser })
 
   } catch (err) {
     console.error('Login error:', err)
