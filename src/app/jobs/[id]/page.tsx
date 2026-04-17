@@ -14,6 +14,7 @@ export default function JobDetailPage() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [applying, setApplying] = useState(false)
+  const [applied, setApplied] = useState(false)
   const [coverNote, setCoverNote] = useState('')
   const [applyMessage, setApplyMessage] = useState('')
 
@@ -75,6 +76,7 @@ export default function JobDetailPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.error || 'Failed to apply')
 
+      setApplied(true)
       setApplyMessage('Application submitted successfully.')
       setCoverNote('')
       setTimeout(() => router.push('/dashboard/applications'), 1200)
@@ -252,10 +254,10 @@ export default function JobDetailPage() {
 
                   <button
                     type="submit"
-                    disabled={applying || expired}
-                    style={{ width: '100%', padding: 12, background: expired ? '#CBD5E1' : '#7C3AED', color: '#fff', border: 'none', borderRadius: 8, fontWeight: 600, cursor: expired ? 'not-allowed' : 'pointer', opacity: applying ? 0.7 : 1, marginBottom: 12 }}
+                    disabled={applying || applied || expired}
+                    style={{ width: '100%', padding: 12, background: applied ? '#D1FAE5' : expired ? '#CBD5E1' : '#7C3AED', color: applied ? '#065F46' : '#fff', border: applied ? '1px solid #6EE7B7' : 'none', borderRadius: 8, fontWeight: 600, cursor: applied || expired ? 'not-allowed' : 'pointer', opacity: applying ? 0.7 : 1, marginBottom: 12 }}
                   >
-                    {applying ? 'Applying...' : expired ? 'Applications Closed' : 'Apply Now'}
+                    {applying ? 'Applying...' : applied ? '✓ Applied' : expired ? 'Applications Closed' : 'Apply Now'}
                   </button>
                 </form>
               ) : (
