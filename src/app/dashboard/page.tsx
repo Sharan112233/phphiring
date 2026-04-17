@@ -39,7 +39,7 @@ export default function DashboardPage() {
           fetch('/api/auth/me'),
           fetch('/api/applications?limit=8'),
           fetch('/api/notifications?limit=8'),
-          fetch(`/api/jobs?poster_id=${encodeURIComponent(localUser.id)}&status=open&limit=8`),
+          fetch(`/api/jobs?poster_id=${encodeURIComponent(localUser.id)}&limit=8`),
         ])
 
         const meData = meRes.ok ? await meRes.json() : { user: localUser }

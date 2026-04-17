@@ -35,6 +35,18 @@ export default function JobDetailPage() {
         if (meRes.ok) {
           const meData = await meRes.json()
           setViewer(meData.user || null)
+
+          // Check if already applied
+          if (meData.user?.user_type === 'talent') {
+            const appRes = await fetch('/api/applications?limit=100')
+            if (appRes.ok) {
+              const appData = await appRes.json()
+              const alreadyApplied = (appData.applications || []).some(
+                (a: any) => a.job_id === id || a.job?.id === id
+              )
+              if (alreadyApplied) setApplied(true)
+            }
+          }
         } else {
           setViewer(null)
         }
