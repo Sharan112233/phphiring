@@ -1,5 +1,5 @@
 export default function sitemap() {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://phphiring-lac.vercel.app/'
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://phphiring-lac.vercel.app'
   const now = new Date()
 
   const staticPages = [
